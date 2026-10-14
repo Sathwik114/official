@@ -1,0 +1,85 @@
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  name      String?
+  email     String?  @unique
+  active    Boolean  @default(true)
+  authMode  String   @default("GTI")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model LeaveRequest {
+  id             Int              @id @default(autoincrement())
+  applicantId    String
+  applicantName  String?
+  department     String?
+  section        String?
+  shift          String?
+  empType        String?
+  leaveType      String
+  startDate      DateTime
+  endDate        DateTime
+  fromTime       String?
+  toTime         String?
+  capInTime      String?
+  capOutTime     String?
+  totalDays      Int
+  reason         String
+  relieverId     String?
+  relieverName   String?
+  contactNumber  String?
+  approvalFlow   String
+  currentApprover String
+  status         String           @default("PENDING")
+  hodApproval    String?
+  hodStatus      String?
+  hodRejectId    String?          @map("HodRejectId")
+  hodRejectReason String?         @map("HodRejectReason")
+  cccApproval    String?
+  cccStatus      String?
+  cccRejectId    String?          @map("CccRejectId")
+  cccRejectReason String?         @map("CccRejectReason")
+  hrApproval     String?
+  hrStatus       String?
+  tranId         BigInt?          @map("TranId")
+  tranDate       DateTime?        @map("TranDate")
+  morningLateBy  Decimal?         @db.Decimal(18, 3) @map("MorningLateBy")
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  approvals      LeaveApproval[]
+}
+
+model LeaveApproval {
+  id             Int          @id @default(autoincrement())
+  leaveRequestId Int
+  leaveRequest   LeaveRequest @relation(fields: [leaveRequestId], references: [id])
+  approverId     String
+  decision       String?
+  remarks        String?
+  stepNumber     Int
+  createdAt      DateTime     @default(now())
+}
+
+model LeaveRoleMember {
+  id             Int      @id @default(autoincrement()) @map("Id")
+  roleCode       String   @map("RoleCode")
+  membershipType String   @map("MembershipType")
+  userId         String   @map("UserId")
+  sortOrder      Int      @default(0) @map("SortOrder")
+  isActive       Boolean  @default(true) @map("IsActive")
+  createdAt      DateTime @default(now()) @map("CreatedAt")
+  updatedAt      DateTime @updatedAt @map("UpdatedAt")
+
+  @@unique([roleCode, membershipType, userId], map: "UQ_LeaveRoleMembers")
+  @@map("LeaveRoleMembers")
+}

@@ -1,0 +1,469 @@
+.leaveApprovalMessageWrap {
+  width: 100%;
+  max-width: 100%;
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding: 0 5px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.leaveApprovalMessage {
+  padding: 0.7rem 0.8rem;
+  margin-bottom: 0.8rem;
+  border-radius: 0.7rem;
+  background: #ecfdf5;
+  color: #047857;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.leaveLoadingText {
+  color: #9d174d;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* NEW: root page container fills the viewport exactly and never
+   scrolls itself — all scrolling happens inside .leaveTableScrollWrapper. */
+.leaveFitScreenRoot {
+  height: 100dvh;
+  max-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* Card now grows to fill whatever vertical space is left in the
+   viewport (flex: 1) instead of being sized purely by its content.
+   The scroll wrapper inside it then fills that space and scrolls. */
+.leaveTableCard {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 100%;
+  margin: 1.25rem 0 0;
+  padding: 1rem 5px 1.5rem;
+  box-sizing: border-box;
+  background: #ffffff;
+  border-radius: 1rem;
+  border: 1px solid #fbcfe8;
+  box-shadow: 0 18px 36px -18px rgba(190, 24, 93, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+.leaveTableCard h2 {
+  margin: 0 0 1rem 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #075985;
+  flex-shrink: 0;
+}
+
+.leaveTableCard p {
+  color: #9d174d;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.leaveApprovedCard {
+  background: #fdf7fb;
+  border-color: #f5c2dd;
+}
+
+.leaveBulkActionsRow {
+  margin-top: 0.85rem;
+  display: flex;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+/* Scroll wrapper fills whatever space is left inside the card
+   (driven by the viewport via .leaveFitScreenRoot / flex: 1 on the
+   card above), instead of a fixed rem cap. Only this element scrolls,
+   both vertically and horizontally — the page itself never does. */
+.leaveTableScrollWrapper {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  margin-bottom: 5px;
+  box-sizing: border-box;
+}
+
+.leaveTableScrollWrapper::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.leaveTableScrollWrapper::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+.leaveTableScrollWrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.leaveNoScrollTable {
+  width: 100%;
+  min-width: 54rem;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.leaveNoScrollTable thead th {
+  text-align: left;
+  padding: 0.65rem 0.7rem;
+  font-size: 0.73rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #be185d;
+  border-bottom: 2px solid #fbcfe8;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  background: #ffffff;
+  z-index: 1;
+}
+
+.leaveNoScrollTable tbody td {
+  padding: 0.6rem 0.7rem;
+  color: #374151;
+  border-bottom: 1px solid #fce7f3;
+  white-space: nowrap;
+}
+
+/* Column order (current): 1 checkbox, 2 Date Applied, 3 Applicant ID,
+   4 Applicant Name, 5 Department, 6 Section, 7 Leave Type, 8 From Time,
+   9 To Time, 10 Days, 11 Reason, 12 Attachment, 13 Current Approver,
+   14 Status, 15 Action.
+   Applicant Name (4) gets the min-width that was mistakenly on col 2;
+   Reason (11) gets the wrap-friendly min-width that was mistakenly on col 5 —
+   that mistargeting is what was causing the huge Section/Leave Type gap. */
+.leaveNoScrollTable td:nth-child(4),
+.leaveNoScrollTable th:nth-child(4) {
+  min-width: 10rem;
+  white-space: nowrap;
+}
+
+.leaveNoScrollTable td:nth-child(11),
+.leaveNoScrollTable th:nth-child(11) {
+  min-width: 14rem;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.leaveNoScrollTable th:first-child,
+.leaveNoScrollTable td:first-child {
+  width: 40px;
+  text-align: center;
+}
+
+.leaveNoScrollTable tbody tr:hover {
+  background: #fdf2f8;
+}
+
+.leaveNoScrollTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.applyLeaveButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem 0.9rem;
+  border-radius: 0.6rem;
+  border: none;
+  background: linear-gradient(135deg, #38bdf8, #f472b6);
+  color: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 6px 14px -6px rgba(190, 24, 93, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.applyLeaveButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px -6px rgba(190, 24, 93, 0.45);
+  opacity: 0.95;
+}
+
+.applyLeaveButton:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 10px -6px rgba(190, 24, 93, 0.4);
+}
+
+.applyLeaveButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.leaveDetailOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1.5rem 1.5rem;
+  z-index: 50;
+}
+
+.leaveDetailCardWrap {
+  position: relative;
+  width: 100%;
+  max-width: 56rem;
+}
+
+.leaveDetailCard {
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.9rem;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.4);
+}
+
+.leaveDetailCloseButton {
+  position: absolute;
+  top: -1.1rem;
+  right: -1.1rem;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 9999px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  z-index: 60;
+  box-shadow: 0 6px 16px -4px rgba(15, 23, 42, 0.35);
+}
+
+.leaveDetailCloseButton:hover {
+  background: #f1f5f9;
+}
+
+.leaveDetailTable {
+  display: flex;
+  flex-direction: column;
+}
+
+.leaveDetailRow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.leaveDetailRow:last-of-type {
+  border-bottom: none;
+}
+
+.leaveDetailRowHeader {
+  background: #f8fafc;
+}
+
+.leaveDetailCell {
+  padding: 0.85rem 1.1rem;
+  font-size: 0.85rem;
+  color: #1f2937;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  word-break: break-word;
+}
+
+.leaveDetailCell:last-child {
+  border-right: none;
+}
+
+.leaveDetailCellLabel {
+  font-weight: 600;
+  color: #374151;
+  background: #fafbfc;
+}
+
+.leaveDetailCellValue {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.leaveDetailCellDate {
+  font-weight: 600;
+  color: #374151;
+}
+
+.leaveDetailHighlight {
+  color: #dc2626;
+  font-weight: 700;
+  margin-left: 0.3rem;
+}
+
+.leaveDetailRowReason .leaveDetailCellSpan {
+  grid-column: span 3;
+}
+
+.leaveDetailRowApprover {
+  background: #f8fafc;
+}
+
+.leaveDetailApproverName {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.leaveDetailApproverStatus {
+  font-weight: 700;
+  color: #2563eb;
+}
+
+.leaveDetailActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  padding: 1rem 1.1rem;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+}
+
+.leaveDetailApproveButton {
+  background: linear-gradient(180deg, #38bdf8, #0284c7);
+  color: #ffffff;
+  border: 1px solid #0369a1;
+  border-radius: 0.35rem;
+  padding: 0.55rem 1.8rem;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(2, 132, 199, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.leaveDetailApproveButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(2, 132, 199, 0.45);
+}
+
+.leaveDetailRejectButton {
+  background: #ffffff;
+  color: #dc2626;
+  border: 1px solid #dc2626;
+  border-radius: 0.35rem;
+  padding: 0.55rem 1.8rem;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.leaveDetailRejectButton:hover {
+  background: #fef2f2;
+  transform: translateY(-1px);
+}
+
+.leaveDetailApproveButton:active,
+.leaveDetailRejectButton:active {
+  transform: translateY(0);
+}
+
+.leaveTabBar {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 100%;
+  margin: 0.5rem 0 0;
+  padding: 0 5px;
+  box-sizing: border-box;
+  display: flex;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.leaveTabButton {
+  padding: 0.65rem 1.3rem;
+  border-radius: 0.8rem;
+  border: 1px solid #fbcfe8;
+  background: #ffffff;
+  color: #be185d;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.leaveTabButton:hover {
+  background: #fdf2f8;
+}
+
+.leaveTabButtonActive {
+  background: linear-gradient(135deg, #38bdf8, #f472b6);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 8px 18px -8px rgba(190, 24, 93, 0.45);
+}
+
+/* Month / Year filter bar — now only rendered above the
+   "My Approved Requests" table (see page.js). */
+.leaveFilterBar {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 100%;
+  margin: 0.85rem 0 0;
+  padding: 0 5px;
+  box-sizing: border-box;
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.leaveFilterSelect {
+  padding: 0.45rem 0.7rem;
+  border-radius: 0.6rem;
+  border: 1px solid #fbcfe8;
+  background: #ffffff;
+  color: #be185d;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .leaveDetailRow {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .leaveDetailRowReason .leaveDetailCellSpan {
+    grid-column: span 1;
+  }
+}
+
+@media (max-width: 480px) {
+  .leaveDetailRow {
+    grid-template-columns: 1fr;
+  }
+
+  .leaveDetailCell {
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+  }
+}

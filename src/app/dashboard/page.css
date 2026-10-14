@@ -1,0 +1,402 @@
+/* The page itself never scrolls — only the table body does, once it
+   passes 15 rows. Scrollbar is hidden everywhere at the page level. */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  scrollbar-width: none;      /* Firefox */
+  -ms-overflow-style: none;   /* old Edge/IE */
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;               /* Chrome/Safari/Edge */
+}
+
+.dashboardPage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;              /* was: height: 100vh — now fills whatever height dashboardShell has left after the navbar */
+  min-height: 0;         /* add this — lets it shrink so overflow:hidden + the table's internal scroll behave correctly */
+  padding: 2rem 1.25rem 5px 1.25rem;
+  background: linear-gradient(160deg, #fdf2f8 0%, #fce7f3 50%, #fbcfe8 100%);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.dashboardBlob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(40px);
+  pointer-events: none;
+}
+
+.dashboardBlobOne {
+  top: -6rem;
+  left: -6rem;
+  width: 20rem;
+  height: 20rem;
+  background: radial-gradient(circle, #e0f2fe, transparent 72%);
+  opacity: 0.8;
+}
+
+.dashboardBlobTwo {
+  bottom: -7rem;
+  right: -6rem;
+  width: 20rem;
+  height: 20rem;
+  background: radial-gradient(circle, #f9d5e9, transparent 72%);
+  opacity: 0.7;
+}
+
+.dashboardShell {
+  height: 100vh;              /* was: min-height: 100vh — min-height alone doesn't cap navbar+page to one viewport */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: linear-gradient(160deg, #fdf2f8 0%, #fce7f3 50%, #fbcfe8 100%);
+}
+
+.dashboardNavbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+  background: rgba(255,255,255,0.9);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid #fbcfe8;
+}
+
+.dashboardNavLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.dashboardNavLink {
+  text-decoration: none;
+  padding: 0.55rem 0.9rem;
+  border-radius: 999px;
+  background: #fff;
+  color: #be185d;
+  font-weight: 700;
+  border: 1px solid #fbcfe8;
+}
+
+.dashboardTopBar {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 32rem;
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1.5rem;
+}
+
+.logoutButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.55rem 1rem;
+  border-radius: 0.8rem;
+  border: 1px solid #fbcfe8;
+  background: #ffffff;
+  color: #be185d;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 16px -6px rgba(190, 24, 93, 0.2);
+}
+
+.dashboardAvatar {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
+  flex-shrink: 0;
+}
+
+.dashboardAvatarInner {
+  position: relative;
+  width: 5.5rem;
+  height: 5.5rem;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #38bdf8, #f472b6);
+  color: #fff;
+  font-size: 1.9rem;
+  font-weight: 800;
+  box-shadow: 0 18px 36px -10px rgba(190, 24, 93, 0.35);
+}
+
+.dashboardAvatarStatus {
+  position: absolute;
+  right: 0.15rem;
+  bottom: 0.15rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 9999px;
+  border: 2px solid #fdf2f8;
+  background: #34d399;
+}
+
+.dashboardHeader {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  flex-shrink: 0;             /* keeps its natural height, never gets squashed by the flex table area */
+}
+
+.dashboardHeaderTitle {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 800;
+  color: #075985;
+}
+
+.dashboardHeaderText {
+  margin-top: 0.5rem;
+  color: #9d174d;
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+
+.dashboardAttendance {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 100%;
+  flex: 1;                    /* fills the remaining vertical space below the header */
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* Subtle card instead of a heavy boxed container — professional but not
+     a solid opaque block sitting apart from the page background. */
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid #fbcfe8;
+  border-radius: 1rem;
+  box-shadow: 0 18px 36px -22px rgba(190, 24, 93, 0.35);
+  padding: 1.25rem 1.25rem 0 1.25rem;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.dashboardAttendance h2 {
+  margin: 0 0 0.9rem 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #075985;
+  flex-shrink: 0;
+}
+
+/* --- Fixed row height so the header and each body row line up cleanly --- */
+:root {
+  --att-row-height: 2.6rem;   /* body row height */
+  --att-head-height: 2.6rem;  /* header row height */
+}
+
+.dashboardAttendanceTableWrap {
+  overflow-x: auto;
+  overflow-y: auto;
+  /* No fixed row-count cap here anymore — that was sometimes taller/shorter
+     than the space actually available, which clipped the last row(s)
+     instead of scrolling them. flex:1 + min-height:0 makes this element
+     fill exactly the remaining vertical space (down to the page's 5px
+     bottom padding), and its own scrollbar handles anything beyond that. */
+  flex: 1;
+  min-height: 0;
+  border: 1px solid #fce7f3;
+  border-radius: 0.75rem;
+  background: #ffffff;
+}
+
+.dashboardAttendanceTableWrap::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dashboardAttendanceTableWrap::-webkit-scrollbar-track {
+  background: #fdf2f8;
+}
+
+.dashboardAttendanceTableWrap::-webkit-scrollbar-thumb {
+  background: #f472b6;
+  border-radius: 999px;
+}
+
+.dashboardAttendance table {
+  width: 100%;
+  table-layout: auto;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.dashboardAttendance thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: var(--att-head-height);
+  text-align: left;
+  padding: 0 0.9rem;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+  background: #9d174d;
+  white-space: nowrap;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.dashboardAttendance tbody tr {
+  height: var(--att-row-height);
+}
+
+.dashboardAttendance tbody tr:nth-child(odd) {
+  background: #ffffff;
+}
+
+.dashboardAttendance tbody tr:nth-child(even) {
+  background: #fdf2f8;
+}
+
+.dashboardAttendance tbody tr:hover {
+  background: #fce7f3;
+}
+
+.dashboardAttendance tbody td {
+  padding: 0 0.9rem;
+  color: #374151;
+  border-bottom: 1px solid #f3d6e8;
+  white-space: nowrap;
+}
+
+.dashboardAttendance tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.dashboardAttendance tbody td .applyLeaveButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.85rem;
+  border-radius: 0.6rem;
+  border: none;
+  background: linear-gradient(135deg, #38bdf8, #f472b6);
+  color: #ffffff;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 6px 14px -6px rgba(190, 24, 93, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.dashboardAttendance tbody td .applyLeaveButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px -6px rgba(190, 24, 93, 0.45);
+  opacity: 0.95;
+}
+
+.dashboardAttendance tbody td .applyLeaveButton:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 10px -6px rgba(190, 24, 93, 0.4);
+}
+
+.dashboardAttendance p {
+  color: #9d174d;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.attendanceTimeEditor {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-wrap: nowrap;
+  min-width: 9.5rem;
+}
+
+.attendanceTimeEditor select {
+  width: 3.3rem;
+  padding: 0.28rem 0.15rem;
+  border: 1px solid #fbcfe8;
+  border-radius: 0.35rem;
+  background: #fff;
+  font-size: 0.75rem;
+}
+
+.attendanceTimeEditor select:nth-child(3) {
+  width: 3.1rem;
+}
+
+.attendanceTimeSave {
+  width: 1.7rem;
+  height: 1.7rem;
+  border: 0;
+  border-radius: 999px;
+  background: #16a34a;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.attendanceTimeSave:disabled { opacity: 0.55; cursor: wait; }
+.attendanceTimeMessage { margin: 0 0 0.6rem !important; color: #047857 !important; font-weight: 600; flex-shrink: 0; }
+
+.attendanceTableToolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.attendanceTableToolbar button {
+  padding: 0.5rem 0.9rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.5rem;
+  background: #f8fafc;
+  color: #0f172a;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.attendanceTableToolbar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Plain-text time display shown once a row's time has been saved
+   (the pencil icon reopens the dropdown editor). */
+.attendanceTimeDisplay {
+  font-weight: 600;
+  color: #1e1b3a;
+}
+
+/* Small pencil/close icon button at the end of each row that toggles
+   the time dropdown editors back open. */
+.attendanceEditIconButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.4rem;
+  transition: background 0.15s ease;
+}
+
+.attendanceEditIconButton:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
