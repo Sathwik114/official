@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { getCalendarDateParts } from '@/lib/leaveDateUtils';
 
 const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
@@ -60,11 +61,13 @@ function formatDate(value, timeString) {
   if (!value) return '-';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
-  
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  
+  const calendarDate = getCalendarDateParts(value);
+  if (!calendarDate) return String(value);
+
+  const day = String(calendarDate.day).padStart(2, '0');
+  const month = String(calendarDate.month).padStart(2, '0');
+  const year = calendarDate.year;
+
   let formattedHours = '12';
   let minutes = '00';
   let ampm = 'AM';
@@ -86,8 +89,8 @@ function formatDate(value, timeString) {
       }
     }
   } else {
-    let hours = date.getHours();
-    minutes = String(date.getMinutes()).padStart(2, '0');
+    let hours = date.getUTCHours();
+    minutes = String(date.getUTCMinutes()).padStart(2, '0');
     ampm = hours >= 12 ? 'PM' : 'AM';
     hours = hours % 12;
     hours = hours ? hours : 12;

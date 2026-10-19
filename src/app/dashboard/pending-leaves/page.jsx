@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import * as jose from 'jose';
 import { prisma } from '@/lib/prisma';
 import { isHrUser } from '@/lib/leaveApprovalConfig';
+import { formatCalendarDate, getCalendarDateParts } from '@/lib/leaveDateUtils';
 import PendingLeavesControls from './PendingLeavesControls';
 import './pending-leaves.css';
 
@@ -50,17 +51,6 @@ export default async function PendingLeavesPage({ searchParams }) {
       AND (CccStatus IS NULL OR UPPER(LTRIM(RTRIM(CccStatus))) <> 'REJECTED')
   `;
 
-  function formatDateDDMMYYYY(value) {
-    if (!value) return '-';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '-';
-    return date.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-  }
-
   // Sort by StartDate descending
   const sortedLeaves = [...rawLeaves].sort(
     (a, b) => new Date(b.StartDate) - new Date(a.StartDate)
@@ -88,11 +78,11 @@ export default async function PendingLeavesPage({ searchParams }) {
 
   const pendingLeaves = sortedLeaves.filter((leave) => {
     if (!leave.StartDate) return false;
-    const d = new Date(leave.StartDate);
-    if (Number.isNaN(d.getTime())) return false;
+    const date = getCalendarDateParts(leave.StartDate);
+    if (!date) return false;
 
-    if (selectedYear && d.getFullYear() !== selectedYear) return false;
-    if (selectedMonth && (d.getMonth() + 1) !== selectedMonth) return false;
+    if (selectedYear && date.year !== selectedYear) return false;
+    if (selectedMonth && date.month !== selectedMonth) return false;
 
     const vpPending = !leave.HodStatus || !leave.HodStatus.trim();
     const presidentPending = !leave.CccStatus || !leave.CccStatus.trim();
@@ -139,8 +129,8 @@ export default async function PendingLeavesPage({ searchParams }) {
                   <td>{leave.ApplicantName}</td>
                   <td>{leave.LeaveType}</td>
 
-                  <td>{formatDateDDMMYYYY(leave.StartDate)}</td>
-                  <td>{formatDateDDMMYYYY(leave.EndDate)}</td>
+                  <td>{formatCalendarDate(leave.StartDate)}</td>
+                  <td>{formatCalendarDate(leave.EndDate)}</td>
 
                   <td>{leave.TotalDays}</td>
                   <td>{leave.Reason}</td>

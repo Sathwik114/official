@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import './page.css';
 import './leave-approval.css';
 import { formatApproverList, normalizeApproverList } from '@/lib/leaveUtils';
+import { formatCalendarDate, getCalendarDateParts } from '@/lib/leaveDateUtils';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -91,18 +92,17 @@ export default function LeaveApprovalsPage() {
 
   function formatApplicationDate(request) {
     const value = getDateValue(request);
-    if (!value || Number.isNaN(new Date(value).getTime())) return '-';
-    return new Date(value).toLocaleDateString('en-GB');
+    return formatCalendarDate(value);
   }
 
   function filterByMonthYear(list) {
     if (monthFilter === 'all' && (yearFilter === 'all' || yearFilter === '')) return list;
     return list.filter((r) => {
       const val = getDateValue(r);
-      const d = val ? new Date(val) : null;
-      if (!d || Number.isNaN(d.getTime())) return false;
-      const monthOk = monthFilter === 'all' || d.getMonth() === Number(monthFilter);
-      const yearOk = yearFilter === 'all' || yearFilter === '' || d.getFullYear() === Number(yearFilter);
+      const date = getCalendarDateParts(val);
+      if (!date) return false;
+      const monthOk = monthFilter === 'all' || date.month - 1 === Number(monthFilter);
+      const yearOk = yearFilter === 'all' || yearFilter === '' || date.year === Number(yearFilter);
       return monthOk && yearOk;
     });
   }
@@ -402,11 +402,11 @@ export default function LeaveApprovalsPage() {
                 <div className="leaveDetailRow">
                   <div className="leaveDetailCell leaveDetailCellLabel">Leave Start Date :-</div>
                   <div className="leaveDetailCell leaveDetailCellValue">
-                    {activeRequest.StartDate ? new Date(activeRequest.StartDate).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                    {formatCalendarDate(activeRequest.StartDate)}
                   </div>
                   <div className="leaveDetailCell leaveDetailCellLabel">End Date :-</div>
                   <div className="leaveDetailCell leaveDetailCellValue">
-                    {activeRequest.EndDate ? new Date(activeRequest.EndDate).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                    {formatCalendarDate(activeRequest.EndDate)}
                   </div>
                 </div>
 

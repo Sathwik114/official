@@ -4,20 +4,10 @@ import * as jose from 'jose';
 import { getLeaveApprovalApplicantIds, isHrUser } from '@/lib/leaveApprovalConfig';
 import { getAllLeaveData } from '@/lib/attendanceDb';
 import { getAllLeaveRequestsArchive } from '@/lib/leaveDb';
+import { formatCalendarDate, getCalendarDateParts } from '@/lib/leaveDateUtils';
 import AllLeavesFilters from './AllLeavesFilters';
 import LeaveTypeColumnFilter from './LeaveTypeColumnFilter';
 import './all-leaves.css';
-
-// Formats a date as dd/mm/yyyy regardless of server/browser locale
-function formatDate(dateValue) {
-  if (!dateValue) return '-';
-  const d = new Date(dateValue);
-  if (isNaN(d.getTime())) return '-';
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear();
-  return `${day}/${month}/${year}`;
-}
 
 // Groups certain leave types together under one filter value
 function matchesLeaveType(leaveType, filter) {
@@ -106,13 +96,13 @@ export default async function AllLeavesPage({ searchParams }) {
   // Apply year/month/leaveType filters based on StartDate
   const filteredLeaves = leaves.filter((leave) => {
     if (!leave.StartDate) return false;
-    const d = new Date(leave.StartDate);
-    if (isNaN(d.getTime())) return false;
+    const date = getCalendarDateParts(leave.StartDate);
+    if (!date) return false;
 
-    if (selectedYear && String(d.getFullYear()) !== String(selectedYear)) {
+    if (selectedYear && String(date.year) !== String(selectedYear)) {
       return false;
     }
-    if (selectedMonth && String(d.getMonth() + 1) !== String(selectedMonth)) {
+    if (selectedMonth && String(date.month) !== String(selectedMonth)) {
       return false;
     }
     if (!matchesLeaveType(leave.LeaveType, selectedLeaveType)) {
@@ -166,8 +156,8 @@ export default async function AllLeavesPage({ searchParams }) {
                   <td>{leave.ApplicantName || '-'}</td>
                   <td>{leave.Department || '-'}</td>
                   <td>{leave.Section || '-'}</td>
-                  <td>{formatDate(leave.StartDate)}</td>
-                  <td>{formatDate(leave.EndDate)}</td>
+                  <td>{formatCalendarDate(leave.StartDate)}</td>
+                  <td>{formatCalendarDate(leave.EndDate)}</td>
                   <td>{leave.FromTime || '-'}</td>
                   <td>{leave.ToTime || '-'}</td>
                   <td>{leave.HodStatus || '-'}</td>

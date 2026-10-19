@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { formatCalendarDate } from '@/lib/leaveDateUtils';
 
 async function fetchEmployeeProfile(empcode) {
   try {
@@ -185,8 +186,8 @@ export default function MonitorHodPage({ hodList = [] }) {
       const XLSX = await import('xlsx');
 
       const rows = leaveRecords.map((record) => ({
-        'From Date': record.FromDate ? new Date(record.FromDate).toLocaleDateString() : '-',
-        'To Date': record.ToDate ? new Date(record.ToDate).toLocaleDateString() : '-',
+        'From Date': formatCalendarDate(record.FromDate),
+        'To Date': formatCalendarDate(record.ToDate),
         'From Time': record.FromTime || '-',
         'To Time': record.ToTime || '-',
         'Leave Type': record.LeaveType || '-',
@@ -456,8 +457,8 @@ export default function MonitorHodPage({ hodList = [] }) {
                         const rowKey = `${record.Empcode || selectedEmpCode}-${record.FromDate || idx}-${idx}`;
                         return (
                           <tr key={rowKey}>
-                            <td>{record.FromDate ? new Date(record.FromDate).toLocaleDateString() : '-'}</td>
-                            <td>{record.ToDate ? new Date(record.ToDate).toLocaleDateString() : '-'}</td>
+                            <td>{formatCalendarDate(record.FromDate)}</td>
+                            <td>{formatCalendarDate(record.ToDate)}</td>
                             <td>{record.FromTime || '-'}</td>
                             <td>{record.ToTime || '-'}</td>
                             <td>{record.LeaveType || '-'}</td>

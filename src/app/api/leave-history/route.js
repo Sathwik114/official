@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getLeaveRequestsForApplicant } from "@/lib/leaveDb";
 import { getEmployeeDetails } from "@/lib/payrollDb";
+import { getCalendarDateParts } from "@/lib/leaveDateUtils";
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
@@ -21,8 +22,8 @@ export async function GET(request) {
     if (year) {
       const y = parseInt(year, 10);
       leave = rawLeave.filter((req) => {
-        const d = new Date(req.StartDate || req.FromDate || req.CreatedAt || req.DateApplied);
-        return d.getFullYear() === y;
+        const date = getCalendarDateParts(req.StartDate || req.FromDate || req.CreatedAt || req.DateApplied);
+        return date?.year === y;
       });
     }
 

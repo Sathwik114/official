@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { formatCalendarDate } from '@/lib/leaveDateUtils';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -78,12 +79,8 @@ export default function PendingLeavesControls({ leaves = [] }) {
         'Applicant ID': leave.ApplicantId || '-',
         'Applicant Name': leave.ApplicantName || '-',
         'Leave Type': leave.LeaveType || '-',
-        'Start Date': leave.StartDate
-          ? new Date(leave.StartDate).toLocaleDateString('en-GB')
-          : '-',
-        'End Date': leave.EndDate
-          ? new Date(leave.EndDate).toLocaleDateString('en-GB')
-          : '-',
+        'Start Date': formatCalendarDate(leave.StartDate),
+        'End Date': formatCalendarDate(leave.EndDate),
         'Total Days': leave.TotalDays ?? '-',
         Reason: leave.Reason || '-',
         'Vice President Status': leave.HodStatus || '-',

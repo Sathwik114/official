@@ -3,6 +3,7 @@
 import './MyLeavesPage.css';
 import { useEffect, useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
+import { formatCalendarDate, getCalendarDateParts } from '@/lib/leaveDateUtils';
 
 function truncateReason(reason) {
   if (!reason) return '-';
@@ -11,10 +12,7 @@ function truncateReason(reason) {
 }
 
 function formatDisplayDate(value) {
-  if (!value) return '-';
-  const parsedDate = new Date(value);
-  if (Number.isNaN(parsedDate.getTime())) return '-';
-  return parsedDate.toLocaleDateString('en-GB');
+  return formatCalendarDate(value);
 }
 
 function formatStatus(value) {
@@ -56,9 +54,9 @@ export default function MyLeavesPage() {
     myRequests.forEach((request) => {
       const requestDateValue = request.DateApplied || request.CreatedAt || request.StartDate;
       if (!requestDateValue) return;
-      const requestDate = new Date(requestDateValue);
-      if (Number.isNaN(requestDate.getTime())) return;
-      years.add(requestDate.getFullYear());
+      const requestDate = getCalendarDateParts(requestDateValue);
+      if (!requestDate) return;
+      years.add(requestDate.year);
     });
     return Array.from(years).sort((a, b) => b - a);
   }, [myRequests]);
@@ -68,16 +66,17 @@ export default function MyLeavesPage() {
         .filter((request) => {
           const requestDateValue = request.DateApplied || request.CreatedAt || request.StartDate;
           if (!requestDateValue) return false;
-          const requestDate = new Date(requestDateValue);
-          if (Number.isNaN(requestDate.getTime())) return false;
+          const requestDate = getCalendarDateParts(requestDateValue);
+          if (!requestDate) return false;
 
-          if (dateFilter && requestDate.toISOString().split('T')[0] !== dateFilter) {
+          const dateKey = `${requestDate.year}-${String(requestDate.month).padStart(2, '0')}-${String(requestDate.day).padStart(2, '0')}`;
+          if (dateFilter && dateKey !== dateFilter) {
             return false;
           }
-          if (monthFilter && String(requestDate.getMonth() + 1).padStart(2, '0') !== monthFilter) {
+          if (monthFilter && String(requestDate.month).padStart(2, '0') !== monthFilter) {
             return false;
           }
-          if (yearFilter && String(requestDate.getFullYear()) !== yearFilter) {
+          if (yearFilter && String(requestDate.year) !== yearFilter) {
             return false;
           }
           return true;

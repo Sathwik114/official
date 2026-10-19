@@ -2,6 +2,7 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
+import { formatCalendarDate } from '@/lib/leaveDateUtils';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -82,12 +83,8 @@ export default function AllLeavesFilters({ leaves = [] }) {
         'Applicant Name': leave.ApplicantName || '-',
         Department: leave.Department || '-',
         Section: leave.Section || '-',
-        'Start Date': leave.StartDate
-          ? new Date(leave.StartDate).toLocaleDateString('en-GB')
-          : '-',
-        'End Date': leave.EndDate
-          ? new Date(leave.EndDate).toLocaleDateString('en-GB')
-          : '-',
+        'Start Date': formatCalendarDate(leave.StartDate),
+        'End Date': formatCalendarDate(leave.EndDate),
         'From Time': leave.FromTime || '-',
         'To Time': leave.ToTime || '-',
         'HOD Status': leave.HodStatus || '-',
