@@ -25,7 +25,7 @@ function matchesLeaveType(leaveType, filter) {
     case 'OD':
       return lt === 'OD';
     case 'COFF':
-      return lt === 'COFF' || lt === 'COFF/P' || lt === 'P/COFF';
+      return lt === 'COFF' || lt === 'COFF/P' || lt === 'P/COFF' || lt.replace(/\s+/g, '') === 'COFF/P' || lt.replace(/\s+/g, '') === 'P/COFF';
     case 'P/7H':
       return lt === 'P/7H';
     default:
@@ -163,7 +163,9 @@ export default async function AllLeavesPage({ searchParams }) {
                   <td>{leave.HodStatus || '-'}</td>
                   <td>{leave.CccStatus || '-'}</td>
                   <td>{leave.LeaveType || '-'}</td>
-                  <td>{leave.Reason || '-'}</td>
+                  <td className="allLeavesReasonCell">
+                    <span className="allLeavesReasonText">{leave.Reason || '-'}</span>
+                  </td>
                 </tr>
               ))
             )}

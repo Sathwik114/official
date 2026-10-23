@@ -23,6 +23,23 @@ function formatStatus(value) {
   return normalized;
 }
 
+const CUTOFF_DATE = new Date('2026-09-30T23:59:59.999Z');
+
+function formatDays(val) {
+  if (val === undefined || val === null || val === '') return '-';
+  const num = Number(val);
+  return isNaN(num) ? val : num;
+}
+
+function resolveTotalDays(request) {
+  const reqDate = new Date(request.StartDate || request.DateApplied || request.CreatedAt);
+  const isLegacy = !isNaN(reqDate.getTime()) && reqDate <= CUTOFF_DATE;
+  const daysRaw = isLegacy
+    ? (request.NoofDays !== undefined && request.NoofDays !== null ? request.NoofDays : request.TotalDays)
+    : (request.TotalDays !== undefined && request.TotalDays !== null ? request.TotalDays : request.NoofDays);
+  return formatDays(daysRaw);
+}
+
 export default function MyLeavesPage() {
   const [myRequests, setMyRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -123,6 +140,7 @@ export default function MyLeavesPage() {
       'Leave Type': request.LeaveType || '-',
       'From Time': request.FromTime || '-',
       'To Time': request.ToTime || '-',
+      'Total Days': resolveTotalDays(request),
       'Reason': request.Reason || '-',
       'HOD Status': formatStatus(request.HodStatus),
       'CCC Status': formatStatus(request.CccStatus),
@@ -224,6 +242,7 @@ export default function MyLeavesPage() {
                   <th>Leave Type</th>
                   <th>From Time</th>
                   <th>To Time</th>
+                  <th>Total Days</th>
                   <th>Reason</th>
                   <th>Vice President Approval</th>
                   <th>President Approval</th>
@@ -243,6 +262,7 @@ export default function MyLeavesPage() {
                     <td>{request.LeaveType}</td>
                     <td>{request.FromTime || '-'}</td>
                     <td>{request.ToTime || '-'}</td>
+                    <td>{resolveTotalDays(request)}</td>
                     <td title={request.Reason || ''}>{truncateReason(request.Reason)}</td>
                     <td>{formatStatus(request.HodStatus)}</td>
                     <td>{formatStatus(request.CccStatus)}</td>

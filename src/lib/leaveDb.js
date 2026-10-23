@@ -407,42 +407,42 @@ export async function ensureLeaveTables() {
     -- Keep the legacy AttmSystem trigger compatible with first-level rejections.
     -- CccApproval is normally NULL when the HOD rejects a request, but the
     -- legacy HODApprover column does not allow NULL values.
-    IF OBJECT_ID(N'dbo.trg_AllLeaveRequests_Insert_OnlineLeaveEntry_AttmSystem', N'TR') IS NOT NULL
-    BEGIN
-      EXEC(N'
-        ALTER TRIGGER dbo.trg_AllLeaveRequests_Insert_OnlineLeaveEntry_AttmSystem
-        ON dbo.AllLeaveRequests
-        AFTER INSERT
-        AS
-        BEGIN
-          SET NOCOUNT ON;
+    DECLARE @LeaveEntryTriggerBody NVARCHAR(MAX);
+    SET @LeaveEntryTriggerBody = N'
+      ON dbo.AllLeaveRequests
+      AFTER INSERT
+      AS
+      BEGIN
+        SET NOCOUNT ON;
+        INSERT INTO AttmSystem.dbo.OnlineLeaveEntry
+        (
+          TranId, TranDate, UnitCode, Empcode, EmpName, DeptCode, NSecCode,
+          LeaveType, FromDate, ToDate, FromTime, ToTime, NoofDays, Reason,
+          RelieverEmpcode, ContactNo, EmpLevel, CLApprover, CLAprveStatus,
+          TLApprover, TLAprveStatus, HOSApprover, HOSAprveStatus, HODApprover,
+          HODAprveStatus, FinalApproveLevel, HRApprover, HRAprveStatus,
+          HRLeaveType, LoginId, LoginDate, EntryPerson, MailStatus, HOSReject,
+          HODReject, LeaveCategory
+        )
+        SELECT
+          I.TranId, I.TranDate, ''GTI'', I.ApplicantId, I.ApplicantName,
+          I.Department, I.Section, I.LeaveType, I.StartDate, I.EndDate,
+          I.FromTime, I.ToTime, I.TotalDays, I.Reason, I.RelieverId,
+          I.ContactNumber, ''5'', ''NA'', ''NA'', ''NA'', ''NA'',
+          COALESCE(I.HodApproval, ''''), COALESCE(I.HodStatus, ''PENDING''),
+          COALESCE(I.CccApproval, I.HodApproval, ''''),
+          COALESCE(I.CccStatus, I.HodStatus, ''PENDING''),
+          ''N'', '''', ''N'', I.LeaveType, '''', I.TranDate, I.ApplicantId,
+          '''', '''', '''', I.LeaveType
+        FROM inserted AS I
+        WHERE I.LeaveType IN
+        (''EL'', ''EL/P'', ''P/EL'', ''SL'', ''LWP'', ''LWP/P'', ''P/LWP'', ''OD'');
+      END;';
 
-          INSERT INTO AttmSystem.dbo.OnlineLeaveEntry
-          (
-            TranId, TranDate, UnitCode, Empcode, EmpName, DeptCode, NSecCode,
-            LeaveType, FromDate, ToDate, FromTime, ToTime, NoofDays, Reason,
-            RelieverEmpcode, ContactNo, EmpLevel, CLApprover, CLAprveStatus,
-            TLApprover, TLAprveStatus, HOSApprover, HOSAprveStatus, HODApprover,
-            HODAprveStatus, FinalApproveLevel, HRApprover, HRAprveStatus,
-            HRLeaveType, LoginId, LoginDate, EntryPerson, MailStatus, HOSReject,
-            HODReject, LeaveCategory
-          )
-          SELECT
-            I.TranId, I.TranDate, ''GTI'', I.ApplicantId, I.ApplicantName,
-            I.Department, I.Section, I.LeaveType, I.StartDate, I.EndDate,
-            I.FromTime, I.ToTime, I.TotalDays, I.Reason, I.RelieverId,
-            I.ContactNumber, ''5'', ''NA'', ''NA'', ''NA'', ''NA'',
-            COALESCE(I.HodApproval, ''''), COALESCE(I.HodStatus, ''PENDING''),
-            COALESCE(I.CccApproval, I.HodApproval, ''''),
-            COALESCE(I.CccStatus, I.HodStatus, ''PENDING''),
-            ''N'', '''', '''', I.LeaveType, '''', I.TranDate, I.ApplicantId,
-            '''', '''', '''', I.LeaveType
-          FROM inserted AS I
-          WHERE I.LeaveType IN
-          (''EL'', ''SL'', ''LWP'', ''EL/P'', ''P/EL'', ''LWP/P'', ''P/LWP'', ''COFF'', ''COFF/P'', ''P/COFF'', ''OD'');
-        END;
-      ');
-    END;
+    IF OBJECT_ID(N'dbo.trg_AllLeaveRequests_Insert_OnlineLeaveEntry_AttmSystem', N'TR') IS NULL
+      EXEC(N'CREATE TRIGGER dbo.trg_AllLeaveRequests_Insert_OnlineLeaveEntry_AttmSystem' + @LeaveEntryTriggerBody);
+    ELSE
+      EXEC(N'ALTER TRIGGER dbo.trg_AllLeaveRequests_Insert_OnlineLeaveEntry_AttmSystem' + @LeaveEntryTriggerBody);
   `);
 }
 
@@ -1199,7 +1199,7 @@ export async function getAllLeaveRequestsArchive(applicantIds = []) {
       TranId,
       ApplicantId,
       ApplicantName,
-      Department,
+      Department,  
       Section,
       LeaveType,
       StartDate,
@@ -1211,7 +1211,33 @@ export async function getAllLeaveRequestsArchive(applicantIds = []) {
       Reason
     FROM dbo.AllLeaveRequests
     WHERE LTRIM(RTRIM(ApplicantId)) IN (${parameters.join(', ')})
-      AND UPPER(LTRIM(RTRIM(LeaveType))) IN ('COFF', 'P/7H')
+      AND (
+        UPPER(LTRIM(RTRIM(LeaveType))) IN ('COFF', 'COFF/P', 'P/COFF', 'P/7H')
+        OR UPPER(LeaveType) LIKE '%COFF%'
+      )
+    UNION ALL
+    SELECT
+      TranId,
+      ApplicantId,
+      ApplicantName,
+      Department,
+      Section,
+      LeaveType,
+      StartDate,
+      EndDate,
+      FromTime,
+      ToTime,
+      HodStatus,
+      CccStatus,
+      Reason
+    FROM dbo.LeaveRequests
+    WHERE LTRIM(RTRIM(ApplicantId)) IN (${parameters.join(', ')})
+      AND (
+        UPPER(LTRIM(RTRIM(LeaveType))) IN ('COFF', 'COFF/P', 'P/COFF', 'P/7H')
+        OR UPPER(LeaveType) LIKE '%COFF%'
+      )
+      AND Status <> 'REJECTED'
+      AND Id NOT IN (SELECT LeaveRequestId FROM dbo.AllLeaveRequests WHERE LeaveRequestId IS NOT NULL)
     ORDER BY StartDate DESC;
   `);
 

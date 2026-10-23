@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { addLeaveApproval, getLeaveRequestById, updateLeaveRequestRejection, updateLeaveRequestStatus } from '@/lib/leaveDb';
 import { getEmployeeDetails } from '@/lib/payrollDb';
 import { getUserEmail, sendMail, buildLeaveRequestEmailContent, getApprovalStatusesForEmail, getApprovalLink, getDirectApproveLink, getDirectRejectLink } from '@/lib/mail';
-import { isCccUser } from '@/lib/leaveApprovalConfig';
 
 export async function POST(request, { params }) {
   try {
@@ -104,19 +103,6 @@ export async function POST(request, { params }) {
           directApproveLink: getDirectApproveLink(leaveRequestId, nextApprover),
           directRejectLink: getDirectRejectLink(leaveRequestId, nextApprover),
         });
-      } else {
-        if (!(await isCccUser(approvedBy))) {
-          recipientEmail = getUserEmail(leaveRequest.ApplicantId);
-          emailSubject = `Leave Request Approved: ${emailRequest.applicantName}`;
-          emailContent = buildLeaveRequestEmailContent(emailRequest, {
-            action: 'Approved',
-            currentApproverName: approverName,
-            nextApproverName: '',
-            status: 'APPROVED',
-            remarks: remarks || '',
-            senderName: approverName,
-          });
-        }
       }
     } else if (decisionValue === 'REJECTED') {
       recipientEmail = getUserEmail(leaveRequest.ApplicantId);

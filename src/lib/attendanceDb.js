@@ -182,51 +182,147 @@ export async function getAttendanceData(empcode, month, year) {
 
     const attendance = result.recordset || [];
 
-    // Fetch official leave entries from the separate leave DB.
-    let leaves = [];
-    const startOfMonth = new Date(parseInt(yearStr, 10), parseInt(monthStr, 10) - 1, 1);
-    const endOfMonth = new Date(parseInt(yearStr, 10), parseInt(monthStr, 10), 0);
+    // Calculate month bounds as YYYY-MM-DD strings to avoid timezone shift
+    const lastDayOfMonth = new Date(parseInt(yearStr, 10), parseInt(monthStr, 10), 0).getDate();
+    const startOfMonthStr = `${yearStr}-${monthStr}-01`;
+    const endOfMonthStr = `${yearStr}-${monthStr}-${String(lastDayOfMonth).padStart(2, '0')}`;
 
+    function formatToYmd(val) {
+      if (!val) return '';
+      if (val instanceof Date) {
+        const y = val.getUTCFullYear();
+        const m = String(val.getUTCMonth() + 1).padStart(2, '0');
+        const d = String(val.getUTCDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      }
+      const str = String(val).trim();
+      const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match) return `${match[1]}-${match[2]}-${match[3]}`;
+      const dt = new Date(str);
+      if (isNaN(dt.getTime())) return '';
+      const y = dt.getUTCFullYear();
+      const m = String(dt.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(dt.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+
+    // 1. Fetch COFF and P/7H from OfficialLeave.dbo.AllLeaveRequests (and LeaveRequests fallback)
+    let coffAndP7hLeaves = [];
     try {
       const leavePool = await getLeavePool();
-      const leaveResult = await leavePool.request()
+      const coffRes = await leavePool.request()
         .input('Empcode', sql.NVarChar, cleanEmpcode)
-        .input('StartOfMonth', sql.DateTime, startOfMonth)
-        .input('EndOfMonth', sql.DateTime, endOfMonth)
+        .input('StartOfMonth', sql.VarChar(10), startOfMonthStr)
+        .input('EndOfMonth', sql.VarChar(10), endOfMonthStr)
         .query(`
           SELECT
-            ApplicantId,
-            StartDate,
-            EndDate,
+            ApplicantId AS Empcode,
+            LeaveType,
+            StartDate AS FromDate,
+            EndDate AS ToDate,
             Reason
           FROM dbo.AllLeaveRequests
           WHERE LTRIM(RTRIM(ApplicantId)) = @Empcode
-            AND CONVERT(varchar(10), StartDate, 120) <= CONVERT(varchar(10), @EndOfMonth, 120)
-            AND CONVERT(varchar(10), EndDate, 120) >= CONVERT(varchar(10), @StartOfMonth, 120)
+            AND (
+              UPPER(LeaveType) LIKE '%COFF%'
+              OR UPPER(LeaveType) LIKE '%7H%'
+              OR UPPER(LeaveType) LIKE '%1HOUR%'
+            )
+            AND CONVERT(varchar(10), StartDate, 120) <= @EndOfMonth
+            AND CONVERT(varchar(10), EndDate, 120) >= @StartOfMonth
+            AND Reason IS NOT NULL
+            AND LTRIM(RTRIM(Reason)) <> ''
+          UNION ALL
+          SELECT
+            ApplicantId AS Empcode,
+            LeaveType,
+            StartDate AS FromDate,
+            EndDate AS ToDate,
+            Reason
+          FROM dbo.LeaveRequests
+          WHERE LTRIM(RTRIM(ApplicantId)) = @Empcode
+            AND (
+              UPPER(LeaveType) LIKE '%COFF%'
+              OR UPPER(LeaveType) LIKE '%7H%'
+              OR UPPER(LeaveType) LIKE '%1HOUR%'
+            )
+            AND CONVERT(varchar(10), StartDate, 120) <= @EndOfMonth
+            AND CONVERT(varchar(10), EndDate, 120) >= @StartOfMonth
+            AND Reason IS NOT NULL
+            AND LTRIM(RTRIM(Reason)) <> ''
+            AND Status <> 'REJECTED'
+            AND Id NOT IN (SELECT LeaveRequestId FROM dbo.AllLeaveRequests WHERE LeaveRequestId IS NOT NULL)
+          ORDER BY FromDate ASC
         `);
 
-      leaves = leaveResult.recordset || [];
+      coffAndP7hLeaves = coffRes.recordset || [];
     } catch (e) {
-      console.error('Failed to fetch leave data from OfficialLeave.AllLeaveRequests:', e);
-      leaves = [];
+      console.error('Failed to fetch COFF/P7H data from OfficialLeave:', e);
+      coffAndP7hLeaves = [];
     }
 
-    function normalizeDateOnly(d) {
-      const dt = new Date(d);
-      dt.setHours(0, 0, 0, 0);
-      return dt.getTime();
+    // 2. Fetch remaining leave types from AttmSystem.dbo.OnlineLeaveEntry
+    let onlineLeaves = [];
+    try {
+      const oleRes = await pool.request()
+        .input('Empcode', sql.NVarChar, cleanEmpcode)
+        .input('StartOfMonth', sql.VarChar(10), startOfMonthStr)
+        .input('EndOfMonth', sql.VarChar(10), endOfMonthStr)
+        .query(`
+          SELECT
+            Empcode,
+            LeaveType,
+            FromDate,
+            ToDate,
+            Reason
+          FROM dbo.OnlineLeaveEntry
+          WHERE LTRIM(RTRIM(Empcode)) = @Empcode
+            AND CONVERT(varchar(10), FromDate, 120) <= @EndOfMonth
+            AND CONVERT(varchar(10), ToDate, 120) >= @StartOfMonth
+            AND UPPER(LeaveType) NOT LIKE '%COFF%'
+            AND UPPER(LeaveType) NOT LIKE '%7H%'
+            AND UPPER(LeaveType) NOT LIKE '%1HOUR%'
+            AND Reason IS NOT NULL
+            AND LTRIM(RTRIM(Reason)) <> ''
+          ORDER BY FromDate ASC
+        `);
+
+      onlineLeaves = oleRes.recordset || [];
+    } catch (e) {
+      console.error('Failed to fetch remaining leave data from OnlineLeaveEntry:', e);
+      onlineLeaves = [];
     }
 
+    // 3. Annotate attendance: COFF & P/7H from AllLeaveRequests, remaining all from OnlineLeaveEntry
     const annotated = attendance.map((rec) => {
       try {
-        const attTime = normalizeDateOnly(rec.AttDate);
-        const matching = leaves.find((lv) => {
-          if (!lv || !lv.StartDate || !lv.EndDate) return false;
-          const fromTime = normalizeDateOnly(lv.StartDate);
-          const toTime = normalizeDateOnly(lv.EndDate);
-          return attTime >= fromTime && attTime <= toTime;
+        const attDateStr = formatToYmd(rec.AttDate);
+
+        // Check COFF and P/7H first from AllLeaveRequests
+        const matchingCoffOrP7h = coffAndP7hLeaves.find((lv) => {
+          if (!lv || !lv.FromDate || !lv.ToDate) return false;
+          const fromDateStr = formatToYmd(lv.FromDate);
+          const toDateStr = formatToYmd(lv.ToDate);
+          return attDateStr >= fromDateStr && attDateStr <= toDateStr;
         });
-        return { ...rec, Remarks: matching ? (matching.Reason || '') : '' };
+
+        if (matchingCoffOrP7h && matchingCoffOrP7h.Reason) {
+          return { ...rec, Remarks: matchingCoffOrP7h.Reason.trim() };
+        }
+
+        // Remaining leave types from OnlineLeaveEntry
+        const matchingOther = onlineLeaves.find((lv) => {
+          if (!lv || !lv.FromDate || !lv.ToDate) return false;
+          const fromDateStr = formatToYmd(lv.FromDate);
+          const toDateStr = formatToYmd(lv.ToDate);
+          return attDateStr >= fromDateStr && attDateStr <= toDateStr;
+        });
+
+        if (matchingOther && matchingOther.Reason) {
+          return { ...rec, Remarks: matchingOther.Reason.trim() };
+        }
+
+        return { ...rec, Remarks: '' };
       } catch (err) {
         return { ...rec, Remarks: '' };
       }
