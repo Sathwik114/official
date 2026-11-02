@@ -56,17 +56,56 @@ export async function getEmployeeDetailsForMonitor(empcode) {
           EmpName,
           D.DEPTNAME AS DeptCode,
           N.NSECTION AS Section,
+          G.DESIGNAME AS Designation,
+          E.JOINDATE AS JoinDate,
           Shift,
           EmpType,
           EL AS EarnLeaveBalance,
           CL AS SickLeaveBalance
       FROM EmpMast E
       LEFT JOIN DEPTMAST D ON E.DEPTCODE = D.DEPTCODE
+      LEFT JOIN DESIGMAST G ON E.DESIG = G.DESIGCODE
       LEFT JOIN NSECMast N ON E.NSECCODE = N.NSECCODE
       WHERE LTRIM(RTRIM(E.EmpCode)) = @empcode
     `);
 
   return result.recordset[0] || null;
+}
+
+export async function getEmployeeDetailsForIds(empCodes = []) {
+  const normalizedCodes = Array.from(new Set(
+    empCodes.map((empCode) => String(empCode || '').trim()).filter(Boolean)
+  ));
+  if (!normalizedCodes.length) return [];
+
+  const pool = await getPool();
+  const employees = [];
+
+  for (let offset = 0; offset < normalizedCodes.length; offset += 1000) {
+    const batch = normalizedCodes.slice(offset, offset + 1000);
+    const request = pool.request();
+    const parameters = batch.map((empCode, index) => {
+      const parameterName = `EmpCode${index}`;
+      request.input(parameterName, sql.NVarChar, empCode);
+      return `@${parameterName}`;
+    });
+
+    const result = await request.query(`
+      SELECT
+        E.EmpCode AS ApplicantId,
+        E.EmpName AS ApplicantName,
+        D.DEPTNAME AS Department,
+        N.NSECTION AS Section
+      FROM EmpMast E
+      LEFT JOIN DEPTMAST D ON E.DEPTCODE = D.DEPTCODE
+      LEFT JOIN NSECMast N ON E.NSECCODE = N.NSECCODE
+      WHERE LTRIM(RTRIM(E.EmpCode)) IN (${parameters.join(', ')})
+    `);
+
+    employees.push(...(result.recordset || []));
+  }
+
+  return employees;
 }
 
 // Maps a submitted leave type (including half-day variants like 'EL/P', 'P/EL')

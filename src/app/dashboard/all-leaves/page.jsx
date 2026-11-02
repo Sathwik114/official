@@ -4,9 +4,10 @@ import * as jose from 'jose';
 import { getLeaveApprovalApplicantIds, isHrUser } from '@/lib/leaveApprovalConfig';
 import { getAllLeaveData } from '@/lib/attendanceDb';
 import { getAllLeaveRequestsArchive } from '@/lib/leaveDb';
-import { formatCalendarDate, getCalendarDateParts } from '@/lib/leaveDateUtils';
+import { getEmployeeDetailsForIds } from '@/lib/payrollDb';
+import { getCalendarDateParts } from '@/lib/leaveDateUtils';
 import AllLeavesFilters from './AllLeavesFilters';
-import LeaveTypeColumnFilter from './LeaveTypeColumnFilter';
+import AllLeavesTable from './AllLeavesTable';
 import './all-leaves.css';
 
 // Groups certain leave types together under one filter value
@@ -71,6 +72,34 @@ export default async function AllLeavesPage({ searchParams }) {
       seen.add(key);
       return true;
     });
+
+    try {
+      const employeeDetails = await getEmployeeDetailsForIds(
+        leaves.map((leave) => leave.ApplicantId)
+      );
+      const employeeDetailsById = new Map(
+        employeeDetails.map((employee) => [
+          String(employee.ApplicantId || '').trim(),
+          employee,
+        ])
+      );
+
+      leaves = leaves.map((leave) => {
+        const employee = employeeDetailsById.get(
+          String(leave.ApplicantId || '').trim()
+        );
+        if (!employee) return leave;
+
+        return {
+          ...leave,
+          ApplicantName: employee.ApplicantName || leave.ApplicantName,
+          Department: employee.Department || leave.Department,
+          Section: employee.Section || leave.Section,
+        };
+      });
+    } catch (error) {
+      console.error('Failed to load employee details for all leave requests:', error);
+    }
   } catch (error) {
     console.error('Failed to load all leave requests:', error);
     leaves = [];
@@ -117,61 +146,7 @@ export default async function AllLeavesPage({ searchParams }) {
 
       <AllLeavesFilters leaves={filteredLeaves} />
 
-      <div className="allLeavesTableWrapper">
-        <table className="allLeavesTable">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Employee ID</th>
-              <th>Employee Name</th>
-              <th>Department</th>
-              <th>Section</th>
-              <th>Start Date</th>
-              <th>End Date</th>
-              <th>From Time</th>
-              <th>To Time</th>
-              <th>Vice President Status</th>
-              <th>President Status</th>
-              <th className="leaveTypeHeaderCell">
-                <div className="leaveTypeHeaderInner">
-                  <span>Leave Type</span>
-                  <LeaveTypeColumnFilter />
-                </div>
-              </th>
-              <th>Reason</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredLeaves.length === 0 ? (
-              <tr>
-                <td colSpan={13} className="allLeavesEmptyCell">
-                  No leave requests found.
-                </td>
-              </tr>
-            ) : (
-              filteredLeaves.map((leave, index) => (
-                <tr key={`${leave.ApplicantId}-${leave.StartDate}-${leave.EndDate}-${index}`}>
-                  <td>{index + 1}</td>
-                  <td>{leave.ApplicantId || '-'}</td>
-                  <td>{leave.ApplicantName || '-'}</td>
-                  <td>{leave.Department || '-'}</td>
-                  <td>{leave.Section || '-'}</td>
-                  <td>{formatCalendarDate(leave.StartDate)}</td>
-                  <td>{formatCalendarDate(leave.EndDate)}</td>
-                  <td>{leave.FromTime || '-'}</td>
-                  <td>{leave.ToTime || '-'}</td>
-                  <td>{leave.HodStatus || '-'}</td>
-                  <td>{leave.CccStatus || '-'}</td>
-                  <td>{leave.LeaveType || '-'}</td>
-                  <td className="allLeavesReasonCell">
-                    <span className="allLeavesReasonText">{leave.Reason || '-'}</span>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <AllLeavesTable leaves={filteredLeaves} />
     </div>
   );
 }

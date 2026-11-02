@@ -3,6 +3,7 @@
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { formatCalendarDate } from '@/lib/leaveDateUtils';
+import LeaveTypeColumnFilter from './LeaveTypeColumnFilter';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -146,6 +147,11 @@ export default function AllLeavesFilters({ leaves = [] }) {
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="filterGroup">
+        <label htmlFor="leaveType">Leave Type</label>
+        <LeaveTypeColumnFilter />
       </div>
 
       {isFiltered && (

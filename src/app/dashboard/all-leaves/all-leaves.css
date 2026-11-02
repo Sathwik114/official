@@ -27,16 +27,6 @@
   font-weight: 600;
   color: #444;
 }
-.leaveTypeHeaderCell {
-  vertical-align: middle;
-}
-
-.leaveTypeHeaderInner {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
 .allLeavesEmptyCell {
   text-align: center;
   padding: 24px 12px;
@@ -52,6 +42,10 @@
   background: #fff;
   cursor: pointer;
   max-width: 130px;
+}
+
+.filterGroup .columnFilterSelect {
+  min-width: 200px;
 }
 
 .filterGroup select,
@@ -123,7 +117,8 @@
   width: 100%;
   max-width: 100%;
   max-height: 520px;
-  overflow: auto;
+  overflow-x: scroll;
+  overflow-y: scroll;
   border: 1px solid #e0e0e0;
   scrollbar-width: thin;
   scrollbar-color: #9ca3af #f1f1f1;
@@ -151,9 +146,9 @@
 }
 
 .allLeavesTable {
-  width: 100%;
-  min-width: 1400px;
-  table-layout: fixed;
+  width: max-content;
+  min-width: 1600px;
+  table-layout: auto;
   border-collapse: collapse;
 }
 
@@ -194,10 +189,13 @@
 }
 
 .allLeavesTable th:nth-child(10),
-.allLeavesTable td:nth-child(10),
+.allLeavesTable td:nth-child(10) {
+  width: 110px;
+}
+
 .allLeavesTable th:nth-child(11),
 .allLeavesTable td:nth-child(11) {
-  width: 170px;
+  width: 110px;
 }
 
 .allLeavesTable th:nth-child(12),
@@ -207,7 +205,7 @@
 
 .allLeavesTable th:nth-child(13),
 .allLeavesTable td:nth-child(13) {
-  width: 260px;
+  width: max-content;
 }
 
 .allLeavesTable th,
@@ -221,34 +219,41 @@
   text-overflow: ellipsis;
 }
 
+.allLeavesTable th:nth-child(-n+12),
+.allLeavesTable td:nth-child(-n+12) {
+  text-align: center;
+}
+
 .allLeavesTable tbody tr {
-  height: 52px;
+  height: 36px;
+  cursor: pointer;
+}
+
+.allLeavesTable tbody td {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+.allLeavesTable tbody tr.allLeavesSelectedRow > td {
+  background-color: #dbeafe;
+}
+
+.allLeavesTable tbody tr.allLeavesSelectedRow:hover > td {
+  background-color: #bfdbfe;
+}
+
+.allLeavesTable tbody tr:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
 }
 
 .allLeavesReasonCell {
-  overflow: hidden;
-  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
 }
 
 .allLeavesReasonText {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.allLeavesReasonCell:hover {
-  overflow: visible !important;
-  position: relative;
-  z-index: 2;
-  background-color: #fff;
-}
-
-.allLeavesReasonCell:hover .allLeavesReasonText {
-  overflow: visible;
-  text-overflow: clip;
-  white-space: normal;
-  overflow-wrap: anywhere;
 }
 
 .allLeavesTable th {

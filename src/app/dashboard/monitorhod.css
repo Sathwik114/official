@@ -273,13 +273,12 @@
 }
 
 .hodListTable tbody tr {
-  height: auto;
-  min-height: 30px;
+  height: 30px;
 }
 
 .hodListTable th,
 .hodListTable td {
-  padding: 0.18rem 0.5rem;
+  padding: 0.08rem 0.5rem;
   font-size: 12px;
 }
 
@@ -288,40 +287,44 @@
   overflow-x: visible;
 }
 
-/* Column widths — View column widened, Name trimmed slightly so the
-   two action buttons have room to sit fully inside the cell */
+/* Column widths leave room for employee details and both View actions. */
 .hodListTable th:nth-child(1),
 .hodListTable td:nth-child(1) { width: 6%; }  /* ID */
 .hodListTable th:nth-child(2),
 .hodListTable td:nth-child(2) { width: 10%; } /* Employee ID */
 .hodListTable th:nth-child(3),
-.hodListTable td:nth-child(3) { width: 21%; } /* Employee Name */
+.hodListTable td:nth-child(3) { width: 16%; } /* Employee Name */
 .hodListTable th:nth-child(4),
-.hodListTable td:nth-child(4) { width: 10%; } /* Department */
+.hodListTable td:nth-child(4) { width: 14%; } /* Department */
 .hodListTable th:nth-child(5),
-.hodListTable td:nth-child(5) { width: 10%; } /* Section */
+.hodListTable td:nth-child(5) { width: 8%; } /* Section */
 .hodListTable th:nth-child(6),
-.hodListTable td:nth-child(6) { width: 43%; } /* View */
+.hodListTable td:nth-child(6) { width: 16%; } /* Designation */
+.hodListTable th:nth-child(7),
+.hodListTable td:nth-child(7) { width: 10%; } /* Joining Date */
+.hodListTable th:nth-child(8),
+.hodListTable td:nth-child(8) { width: 250px; } /* View */
 
-/* Let the View column's cell content wrap/shrink instead of being
-   hard-clipped by the shared th/td overflow:hidden + nowrap rules
-   above — that clipping (combined with centering) is what was
-   cutting off the left side of the button text. */
-.hodListTable td:nth-child(6) {
-  overflow: visible;
+/* Keep the actions contained within the View column. */
+.hodListTable td:nth-child(8) {
+  overflow: hidden;
   text-overflow: clip;
-  white-space: normal;
+  white-space: nowrap;
+}
+
+.hodViewCell {
+  text-align: center !important;
 }
 
 .hodActionsCell {
-  display: flex;
-  gap: 0.4rem;
+  display: inline-flex;
+  gap: 0.5rem;
   align-items: center;
   justify-content: center;
-  white-space: normal;   /* was nowrap — that forced the row to overflow the cell */
-  flex-wrap: wrap;       /* buttons drop to a second line instead of overflowing */
-  row-gap: 0.35rem;
-  padding: 0.25rem 0;
+  max-width: 100%;
+  white-space: nowrap;
+  flex-wrap: nowrap;
+  padding: 0;
 }
 
 /* Detail attendance table: compact row heights, wrapper flexes to fill
@@ -341,9 +344,32 @@
 }
 
 .attendanceDetailWrapper {
-  max-height: 100%;
-  flex: 1;
+  max-height: 546px;
+  flex: 0 1 auto;
   min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #9ca3af #f1f1f1;
+  -ms-overflow-style: auto;
+}
+
+.attendanceDetailWrapper::-webkit-scrollbar {
+  display: block;
+  width: 12px;
+}
+
+.attendanceDetailWrapper::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.attendanceDetailWrapper::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  border: 3px solid #f1f1f1;
+  border-radius: 6px;
+}
+
+.attendanceDetailWrapper::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
 }
 
 .attendanceDetailTableWrapper {
@@ -415,33 +441,32 @@
    widened column without clipping. */
 .viewLeaveButton {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   gap: 0.3rem;
-  padding: 0.3rem 0.65rem;
+  padding: 0.2rem 0.65rem;
   border-radius: 0.6rem;
-  border: none;
-  background: linear-gradient(135deg, #aea8c0);
-  color: #1f1c1c;
-  font-size: 11px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #111827;
+  font-size: 12px;
   line-height: 1.3;
   font-weight: 700;
   letter-spacing: 0;
   cursor: pointer;
   white-space: nowrap;
-  flex-shrink: 0;
-  box-shadow: 0 6px 14px -6px rgba(124, 58, 237, 0.4);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  box-shadow: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .viewLeaveButton:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 18px -6px rgba(124, 58, 237, 0.5);
-  opacity: 0.95;
+  background-color: #f3f4f6;
+  border-color: #9ca3af;
 }
 
 .viewLeaveButton:active {
-  transform: translateY(0);
+  background-color: #e5e7eb;
 }
 
 /* Leave header info: Empcode / Empname / Department / Section */
@@ -476,61 +501,93 @@
 }
 
 .leaveDetailWrapper {
-  max-height: 100%;
-  flex: 1;
+  max-height: 546px;
+  flex: 0 1 auto;
   min-height: 0;
+  overflow-y: scroll;
+  scrollbar-width: thin;
+  scrollbar-color: #9ca3af #f1f1f1;
+  -ms-overflow-style: auto;
+}
+
+.leaveDetailWrapper::-webkit-scrollbar {
+  display: block;
+  width: 12px;
+}
+
+.leaveDetailWrapper::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.leaveDetailWrapper::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  border: 3px solid #f1f1f1;
+  border-radius: 6px;
+}
+
+.leaveDetailWrapper::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
 }
 
 .leaveDetailTable th:nth-child(1),
-.leaveDetailTable td:nth-child(1) { width: 12%; } /* From Date */
+.leaveDetailTable td:nth-child(1) { width: 6%; } /* S.No */
 .leaveDetailTable th:nth-child(2),
-.leaveDetailTable td:nth-child(2) { width: 12%; } /* To Date */
+.leaveDetailTable td:nth-child(2) { width: 12%; } /* From Date */
 .leaveDetailTable th:nth-child(3),
-.leaveDetailTable td:nth-child(3) { width: 11%; } /* From Time */
+.leaveDetailTable td:nth-child(3) { width: 12%; } /* To Date */
 .leaveDetailTable th:nth-child(4),
-.leaveDetailTable td:nth-child(4) { width: 11%; } /* To Time */
+.leaveDetailTable td:nth-child(4) { width: 11%; } /* From Time */
 .leaveDetailTable th:nth-child(5),
-.leaveDetailTable td:nth-child(5) { width: 12%; } /* Leave Type */
+.leaveDetailTable td:nth-child(5) { width: 11%; } /* To Time */
 .leaveDetailTable th:nth-child(6),
-.leaveDetailTable td:nth-child(6) { width: 10%; } /* No. of Days */
+.leaveDetailTable td:nth-child(6) { width: 12%; } /* Leave Type */
 .leaveDetailTable th:nth-child(7),
-.leaveDetailTable td:nth-child(7) { width: 32%; } /* Reason */
+.leaveDetailTable td:nth-child(7) { width: 10%; } /* No. of Days */
+.leaveDetailTable th:nth-child(8),
+.leaveDetailTable td:nth-child(8) { width: 32%; } /* Reason */
+
+.leaveDetailTable th:nth-child(8),
+.leaveDetailTable td:nth-child(8) {
+  text-align: left;
+}
 
 .viewAttendanceButton {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   gap: 0.3rem;
-  padding: 0.3rem 0.65rem;
+  padding: 0.2rem 0.65rem;
   border-radius: 0.6rem;
-  border: none;
-  background: linear-gradient(135deg, #a08086);
-  color: #fbfbfc;
-  font-size: 11px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #111827;
+  font-size: 12px;
   line-height: 1.3;
   font-weight: 700;
   letter-spacing: 0;
   cursor: pointer;
   white-space: nowrap;
-  flex-shrink: 0;
-  box-shadow: 0 6px 14px -6px rgba(190, 24, 93, 0.4);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+  box-shadow: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .viewAttendanceButton:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 18px -6px rgba(190, 24, 93, 0.5);
-  opacity: 0.95;
+  background-color: #f3f4f6;
+  border-color: #9ca3af;
 }
 
 .viewAttendanceButton:active {
-  transform: translateY(0);
+  background-color: #e5e7eb;
 }
 
-/* Small screens: stack the two action buttons full-width in the
-   View column instead of squeezing them side by side, so the text
-   stays readable rather than shrinking further. */
+/* Keep both View actions together on small screens and provide horizontal
+   scrolling so the buttons remain readable. */
 @media (max-width: 600px) {
+  .hodListTable {
+    min-width: 680px;
+  }
+
   .hodListTable th:nth-child(1),
   .hodListTable td:nth-child(1) { width: 8%; }  /* ID */
   .hodListTable th:nth-child(2),
@@ -540,22 +597,25 @@
   .hodListTable th:nth-child(4),
   .hodListTable td:nth-child(4),
   .hodListTable th:nth-child(5),
-  .hodListTable td:nth-child(5) {
-    display: none; /* hide Department/Section to make room for the buttons */
-  }
+  .hodListTable td:nth-child(5),
   .hodListTable th:nth-child(6),
-  .hodListTable td:nth-child(6) { width: 52%; }
+  .hodListTable td:nth-child(6),
+  .hodListTable th:nth-child(7),
+  .hodListTable td:nth-child(7) {
+    display: none;
+  }
+  .hodListTable th:nth-child(8),
+  .hodListTable td:nth-child(8) { width: 52%; }
 
   .hodActionsCell {
-    flex-direction: column;
     flex-wrap: nowrap;
-    gap: 0.35rem;
+    gap: 0.25rem;
   }
 
   .viewLeaveButton,
   .viewAttendanceButton {
-    width: 100%;
+    width: auto;
     font-size: 12px;
-    padding: 0.4rem 0.5rem;
+    padding: 0.2rem 0.55rem;
   }
 }

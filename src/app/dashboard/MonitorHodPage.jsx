@@ -14,9 +14,9 @@ async function fetchEmployeeProfile(empcode) {
   }
 }
 
-// Sorts attendance records by AttDate, newest first.
-function sortAttendanceDesc(records) {
-  return [...records].sort((a, b) => new Date(b.AttDate) - new Date(a.AttDate));
+// Sorts attendance records by AttDate, oldest first.
+function sortAttendanceAsc(records) {
+  return [...records].sort((a, b) => new Date(a.AttDate) - new Date(b.AttDate));
 }
 
 // Sorts leave records by FromDate, newest first.
@@ -51,7 +51,7 @@ export default function MonitorHodPage({ hodList = [] }) {
       const res = await fetch(`/api/employee?empcode=${empcode}&month=${month}&year=${year}&monitor=true`);
       const data = await res.json();
       if (res.ok && data.attendance) {
-        setAttendance(sortAttendanceDesc(data.attendance));
+        setAttendance(sortAttendanceAsc(data.attendance));
         setSelectedEmployee(data.employee || null);
       } else {
         setAttendance([]);
@@ -151,7 +151,7 @@ export default function MonitorHodPage({ hodList = [] }) {
       const XLSX = await import('xlsx');
 
       const rows = attendance.map((record) => ({
-        Date: record.AttDate ? new Date(record.AttDate).toLocaleDateString() : '-',
+        Date: formatCalendarDate(record.AttDate),
         'Attendance Type': record.AttType || '-',
         'In Time': record.InTime || '-',
         'Out Time': record.OutTime || '-',
@@ -230,10 +230,12 @@ export default function MonitorHodPage({ hodList = [] }) {
                 <thead>
                   <tr>
                     <th>ID</th>
-                    <th>Employee ID</th>
-                    <th>Employee Name</th>
-                    <th>Department</th>
+                    <th>Emp ID</th>
+                    <th>Emp Name</th>
+                    <th>Dept</th>
                     <th>Section</th>
+                    <th>Desig</th>
+                    <th>Joining Date</th>
                     <th>View</th>
                   </tr>
                 </thead>
@@ -247,21 +249,25 @@ export default function MonitorHodPage({ hodList = [] }) {
                         <td>{profile?.EmpName || '-'}</td>
                         <td>{profile?.DeptCode || '-'}</td>
                         <td>{profile?.Section || '-'}</td>
-                        <td className="hodActionsCell">
-                          <button
-                            type="button"
-                            className="viewAttendanceButton"
-                            onClick={() => handleViewAttendance(hod.id)}
-                          >
-                            👁️ View Attendance
-                          </button>
-                          <button
-                            type="button"
-                            className="viewLeaveButton"
-                            onClick={() => handleViewLeave(hod.id)}
-                          >
-                            📋 View Leave
-                          </button>
+                        <td>{profile?.Designation || '-'}</td>
+                        <td>{formatCalendarDate(profile?.JoinDate)}</td>
+                        <td className="hodViewCell">
+                          <div className="hodActionsCell">
+                            <button
+                              type="button"
+                              className="viewAttendanceButton"
+                              onClick={() => handleViewAttendance(hod.id)}
+                            >
+                              👁️ View Attendance
+                            </button>
+                            <button
+                              type="button"
+                              className="viewLeaveButton"
+                              onClick={() => handleViewLeave(hod.id)}
+                            >
+                              📋 View Leaves
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -353,11 +359,10 @@ export default function MonitorHodPage({ hodList = [] }) {
                     </thead>
                     <tbody>
                       {attendance.map((record, idx) => {
-                        const date = new Date(record.AttDate);
                         const rowKey = `${record.Empcode || selectedEmpCode}-${record.AttDate ? new Date(record.AttDate).toISOString() : idx}`;
                         return (
                           <tr key={rowKey}>
-                            <td>{date.toLocaleDateString()}</td>
+                            <td>{formatCalendarDate(record.AttDate)}</td>
                             <td>{record.InTime || '-'}</td>
                             <td>{record.OutTime || '-'}</td>
                             <td>{record.AttType || '-'}</td>
@@ -443,6 +448,7 @@ export default function MonitorHodPage({ hodList = [] }) {
                   <table className="attendanceTable leaveDetailTable">
                     <thead>
                       <tr>
+                        <th>S.No</th>
                         <th>From Date</th>
                         <th>To Date</th>
                         <th>From Time</th>
@@ -457,6 +463,7 @@ export default function MonitorHodPage({ hodList = [] }) {
                         const rowKey = `${record.Empcode || selectedEmpCode}-${record.FromDate || idx}-${idx}`;
                         return (
                           <tr key={rowKey}>
+                            <td>{idx + 1}</td>
                             <td>{formatCalendarDate(record.FromDate)}</td>
                             <td>{formatCalendarDate(record.ToDate)}</td>
                             <td>{record.FromTime || '-'}</td>

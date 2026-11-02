@@ -33,6 +33,8 @@ export default function LeaveTypeColumnFilter() {
   return (
     <select
       className="columnFilterSelect"
+      id="leaveType"
+      name="leaveType"
       value={leaveType}
       onChange={handleChange}
       onClick={(e) => e.stopPropagation()}

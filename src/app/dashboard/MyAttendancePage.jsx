@@ -636,7 +636,7 @@ export default function MyAttendancePage({ empcode }) {
             />
           </div>
 
-          <div className="attendanceExportActions">
+          <div className="attendanceExportActions" style={{ display: 'none' }}>
             <button
               type="button"
               className="downloadExcelButton"
