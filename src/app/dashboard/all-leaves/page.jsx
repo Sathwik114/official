@@ -5,6 +5,7 @@ import { getLeaveApprovalApplicantIds, isHrUser } from '@/lib/leaveApprovalConfi
 import { getAllLeaveData } from '@/lib/attendanceDb';
 import { getAllLeaveRequestsArchive } from '@/lib/leaveDb';
 import { getEmployeeDetailsForIds } from '@/lib/payrollDb';
+import { getLeaveDocumentTranIds } from '@/lib/leaveDocumentStorage';
 import { getCalendarDateParts } from '@/lib/leaveDateUtils';
 import AllLeavesFilters from './AllLeavesFilters';
 import AllLeavesTable from './AllLeavesTable';
@@ -72,6 +73,19 @@ export default async function AllLeavesPage({ searchParams }) {
       seen.add(key);
       return true;
     });
+
+    try {
+      const attachmentTranIds = new Set(
+        await getLeaveDocumentTranIds(leaves.map((leave) => leave.TranId))
+      );
+      leaves = leaves.map((leave) => ({
+        ...leave,
+        HasAttachment: attachmentTranIds.has(String(leave.TranId || '').trim()),
+      }));
+    } catch (error) {
+      console.error('Failed to check attachments for all leave requests:', error);
+      leaves = leaves.map((leave) => ({ ...leave, HasAttachment: false }));
+    }
 
     try {
       const employeeDetails = await getEmployeeDetailsForIds(
@@ -142,9 +156,10 @@ export default async function AllLeavesPage({ searchParams }) {
 
   return (
     <div className="allLeavesContainer">
-      <h1 className="allLeavesTitle">All Leave Requests</h1>
-
-      <AllLeavesFilters leaves={filteredLeaves} />
+      <div className="allLeavesHeader">
+        <h1 className="allLeavesTitle">All Leave Requests</h1>
+        <AllLeavesFilters leaves={filteredLeaves} />
+      </div>
 
       <AllLeavesTable leaves={filteredLeaves} />
     </div>

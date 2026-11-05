@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import './page.css';
 import './leave-approval.css';
 import { formatApproverList, normalizeApproverList } from '@/lib/leaveUtils';
@@ -11,55 +11,149 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-export default function LeaveApprovalsPage() {
+function formatApprovalStatus(status, approverId) {
+  const normalizedStatus = String(status || '').trim().toUpperCase();
+  if (!normalizedStatus || normalizedStatus === 'PENDING') return 'Pending';
+  if (normalizedStatus === 'ACCEPT' || normalizedStatus === 'APPROVED') {
+    const normalizedApproverId = String(approverId || '').trim();
+    return normalizedApproverId ? `Accept (${normalizedApproverId})` : 'Accept';
+  }
+  if (normalizedStatus === 'REJECTED') return 'Rejected';
+  return status;
+}
+
+function formatRequestStatus(status) {
+  const normalizedStatus = String(status || '').trim().toUpperCase();
+  if (normalizedStatus === 'APPROVED') return 'Approved';
+  if (normalizedStatus === 'PENDING') return 'Pending';
+  if (normalizedStatus === 'REJECTED') return 'Rejected';
+  return status || '-';
+}
+
+function getApprovalStatusClass(status) {
+  const normalizedStatus = String(status || '').trim().toUpperCase();
+  if (!normalizedStatus || normalizedStatus === 'PENDING') return 'leaveApprovalStatusPending';
+  if (normalizedStatus === 'ACCEPT' || normalizedStatus === 'APPROVED') return 'leaveApprovalStatusAccepted';
+  if (normalizedStatus === 'REJECTED') return 'leaveApprovalStatusRejected';
+  return '';
+}
+
+export default function LeaveApprovalsPage({ directMode = false, directToken = '' }) {
   const [pendingApprovals, setPendingApprovals] = useState([]);
   const [approvedRequests, setApprovedRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [directLinkUnavailable, setDirectLinkUnavailable] = useState(false);
   const [message, setMessage] = useState('');
+  const [actionPopup, setActionPopup] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
+  const [selectedRowId, setSelectedRowId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [activeTab, setActiveTab] = useState('pending');
   const currentDate = new Date();
   const [monthFilter, setMonthFilter] = useState(String(currentDate.getMonth()));
   const [yearFilter, setYearFilter] = useState(String(currentDate.getFullYear()));
+  const [approvedSearch, setApprovedSearch] = useState('');
 
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/leave');
-      const data = await res.json();
-      if (res.ok) {
-        setPendingApprovals(data.pendingApprovals || []);
-        setApprovedRequests(data.approvedRequests || []);
+      const res = await fetch(directMode ? '/api/leave/approve-direct' : '/api/leave', {
+        cache: 'no-store',
+        headers: directToken ? { Authorization: 'Bearer ' + directToken } : undefined,
+      });
+      if (directMode && res.status === 401) {
+        setDirectLinkUnavailable(true);
+        setPendingApprovals([]);
+        setApprovedRequests([]);
+        setMessage('');
+        return;
       }
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load leave approvals.');
+      setPendingApprovals(data.pendingApprovals || []);
+      setApprovedRequests(data.approvedRequests || []);
+      setDirectLinkUnavailable(false);
     } catch (err) {
       console.error('Failed to load leave approvals:', err);
+      setMessage(err.message || 'Failed to load leave approvals.');
     } finally {
       setLoading(false);
     }
-  }
+  }, [directMode, directToken]);
 
-  async function handleBulkAction(decision, remarks = '') {
-    if (selectedIds.size === 0) return;
+  useEffect(() => {
+    if (!actionPopup) return undefined;
 
-    const selArray = Array.from(selectedIds);
-    const first = pendingApprovals.find((p) => p.Id === selArray[0]);
+    const timer = setTimeout(() => setActionPopup(null), 1000);
+    return () => clearTimeout(timer);
+  }, [actionPopup]);
+
+  useEffect(() => {
+    if (!directMode) return undefined;
+
+    document.documentElement.classList.add('directApprovalDocument');
+    document.body.classList.add('directApprovalDocument');
+
+    return () => {
+      document.documentElement.classList.remove('directApprovalDocument');
+      document.body.classList.remove('directApprovalDocument');
+    };
+  }, [directMode]);
+
+  async function handleBulkAction(decision, remarks = '', requestIds = Array.from(selectedIds)) {
+    if (requestIds.length === 0) return;
+
+    const first = pendingApprovals.find((p) => p.Id === requestIds[0]);
     const approverId = first?.CurrentApproverId || first?.CurrentApprover || '';
 
     try {
-      const res = await fetch('/api/leave/bulk', {
+      const res = await fetch(directMode ? '/api/leave/approve-direct' : '/api/leave/bulk', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ids: selArray, approverId, decision: decision.toUpperCase(), remarks }),
+        headers: {
+          'Content-Type': 'application/json',
+          ...(directToken ? { Authorization: 'Bearer ' + directToken } : {}),
+        },
+        body: JSON.stringify({ ids: requestIds, approverId, decision: decision.toUpperCase(), remarks }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Bulk action failed');
-      setMessage(decision === 'APPROVED' ? 'Selected requests approved.' : 'Selected requests rejected.');
+      const results = data.results || [];
+      const failedResults = results.filter((result) => !result.success);
+      const succeededCount = results.length - failedResults.length;
+      const actionLabel = decision === 'APPROVED' ? 'approved' : 'rejected';
+      setActionPopup({
+        title: failedResults.length ? 'Action partially completed' : 'Action completed',
+        message: failedResults.length
+          ? `${succeededCount} selected request(s) ${actionLabel}; ${failedResults.length} could not be processed.${failedResults[0]?.error ? ` ${failedResults[0].error}` : ''}`
+          : `Selected requests ${actionLabel}.`,
+        isError: failedResults.length > 0,
+      });
       setSelectedIds(new Set());
       await loadData();
     } catch (err) {
-      setMessage(err.message || 'Bulk action failed');
+      setActionPopup({
+        title: 'Action failed',
+        message: err.message || 'Bulk action failed',
+        isError: true,
+      });
     }
+  }
+
+  async function handleRejectSelected() {
+    const requestIds = Array.from(selectedIds);
+    if (requestIds.length === 0) return;
+
+    const reason = window.prompt(
+      `Enter one rejection reason to apply to all ${requestIds.length} selected leave request(s):`
+    );
+    if (reason === null) return;
+    if (!reason.trim()) {
+      setMessage('A rejection reason is required.');
+      return;
+    }
+
+    await handleBulkAction('REJECTED', reason.trim(), requestIds);
   }
 
   function toggleSelect(id) {
@@ -84,7 +178,7 @@ export default function LeaveApprovalsPage() {
     }, 0);
 
     return () => clearTimeout(timer);
-  }, []);
+  }, [directMode, directToken, loadData]);
 
   function getDateValue(request) {
     return request.DateApplied || request.CreatedAt || request.StartDate;
@@ -111,38 +205,18 @@ export default function LeaveApprovalsPage() {
     const rowKey = request.Id ? `${request.Id}-${isPending ? 'pending' : 'approved'}-${index}` : `${isPending ? 'pending' : 'approved'}-${index}`;
 
     return (
-      <tr key={rowKey}>
+      <tr
+        key={rowKey}
+        className={selectedRowId === request.Id ? 'leaveApprovalSelectedRow' : ''}
+        aria-selected={selectedRowId === request.Id}
+        onClick={() => setSelectedRowId(request.Id)}
+      >
         {isPending && (
           <td style={{ textAlign: 'center' }}>
             <input type="checkbox" checked={selectedIds.has(request.Id)} onChange={() => toggleSelect(request.Id)} />
           </td>
         )}
-        <td>{request.ApplicantId || '-'}</td>
-        <td>{request.ApplicantName || '-'}</td>
-        <td>{request.Department || '-'}</td>
-        <td>{request.Section || '-'}</td>
-        <td>{formatApplicationDate(request)}</td>
-        <td>{request.FromTime || '-'}</td>
-        <td>{request.ToTime || '-'}</td>
-        <td>{request.TotalDays}</td>
-        <td>{request.LeaveType}</td>
-        <td>{request.Reason}</td>
-        <td>
-          {request.TranId && request.AttachmentName ? (
-            <a
-              href={`/api/leave/document/${request.TranId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: '#2563eb', textDecoration: 'underline' }}
-            >
-              {request.AttachmentName}
-            </a>
-          ) : (
-            request.AttachmentName || '-'
-          )}
-        </td>
-        <td>{request.CurrentApprover || '-'}</td>
-        <td>{request.Status}</td>
+        {!isPending && <td>{request.ApplicantId || '-'}</td>}
         <td>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button type="button" className="applyLeaveButton" onClick={() => setExpandedId(request.Id)}>
@@ -150,6 +224,26 @@ export default function LeaveApprovalsPage() {
             </button>
           </div>
         </td>
+        {isPending && <td>{request.ApplicantId || '-'}</td>}
+        <td>{request.ApplicantName || '-'}</td>
+        <td>{request.Department || '-'}</td>
+        <td>{request.Section || '-'}</td>
+        <td>{formatApplicationDate(request)}</td>
+        <td>{formatCalendarDate(request.StartDate || request.FromDate)}</td>
+        <td>{formatCalendarDate(request.EndDate || request.ToDate)}</td>
+        <td>{request.FromTime || '-'}</td>
+        <td>{request.ToTime || '-'}</td>
+        <td>{request.TotalDays}</td>
+        <td>{request.LeaveType}</td>
+        <td>{formatRequestStatus(request.Status)}</td>
+        <td className={getApprovalStatusClass(request.HodStatus)}>
+          {formatApprovalStatus(request.HodStatus, request.HodApproval)}
+        </td>
+        <td className={getApprovalStatusClass(request.CccStatus)}>
+          {formatApprovalStatus(request.CccStatus, request.CccApproval)}
+        </td>
+        <td className="leaveReasonCell">{request.Reason || '-'}</td>
+        <td>{request.CurrentApprover || '-'}</td>
       </tr>
     );
   };
@@ -158,15 +252,40 @@ export default function LeaveApprovalsPage() {
   const uniqueById = Array.from(new Map(combined.map((r) => [r.Id, r])).values());
   const activeRequest = expandedId ? uniqueById.find((r) => r.Id === expandedId) : null;
 
-  const filteredApproved = filterByMonthYear(approvedRequests);
+  const filteredApproved = filterByMonthYear(approvedRequests).filter((request) => {
+    const query = approvedSearch.trim().toLowerCase();
+    if (!query) return true;
+
+    return [
+      request.ApplicantId,
+      request.ApplicantName,
+      request.Department,
+      request.Section,
+      formatApplicationDate(request),
+      formatCalendarDate(request.StartDate || request.FromDate),
+      formatCalendarDate(request.EndDate || request.ToDate),
+      request.FromTime,
+      request.ToTime,
+      request.TotalDays,
+      request.LeaveType,
+      request.Reason,
+      request.AttachmentName,
+      request.CurrentApprover,
+      request.Status,
+    ].some((value) => String(value ?? '').toLowerCase().includes(query));
+  });
 
   async function handleApproveDetail() {
     if (!activeRequest) return;
     try {
-      const res = await fetch(`/api/leave/${activeRequest.Id}`, {
+      const res = await fetch(directMode ? '/api/leave/approve-direct' : `/api/leave/${activeRequest.Id}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(directToken ? { Authorization: 'Bearer ' + directToken } : {}),
+        },
         body: JSON.stringify({
+          ids: directMode ? [activeRequest.Id] : undefined,
           approverId: activeRequest.CurrentApproverId || activeRequest.CurrentApprover,
           decision: 'APPROVED',
           currentApprover: activeRequest.CurrentApproverId || activeRequest.CurrentApprover,
@@ -175,11 +294,19 @@ export default function LeaveApprovalsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Approval failed');
-      setMessage(data.nextApprover ? `Approved. Next approver: ${data.nextApprover}` : 'Approved successfully.');
+      if (directMode && data.results?.some((result) => !result.success)) {
+        throw new Error(data.results.find((result) => !result.success)?.error || 'Unable to approve this request.');
+      }
+      setActionPopup({
+        title: 'Action completed',
+        message: directMode
+          ? 'Leave request approved.'
+          : data.nextApprover ? `Approved. Next approver: ${data.nextApprover}` : 'Approved successfully.',
+      });
       setExpandedId(null);
       await loadData();
     } catch (err) {
-      setMessage(err.message || 'Approval failed');
+      setActionPopup({ title: 'Action failed', message: err.message || 'Approval failed', isError: true });
     }
   }
 
@@ -188,26 +315,38 @@ export default function LeaveApprovalsPage() {
     const reason = window.prompt('Rejection reason:');
     if (reason === null) return;
     try {
-      const res = await fetch('/api/leave/bulk', {
+      const res = await fetch(directMode ? '/api/leave/approve-direct' : '/api/leave/bulk', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: [activeRequest.Id], approverId: activeRequest.CurrentApproverId || activeRequest.CurrentApprover, decision: 'REJECTED', remarks: reason }),
+        headers: {
+          'Content-Type': 'application/json',
+          ...(directToken ? { Authorization: 'Bearer ' + directToken } : {}),
+        },
+        body: JSON.stringify({ ids: [activeRequest.Id], approverId: activeRequest.CurrentApproverId || activeRequest.CurrentApprover, decision: 'REJECTED', remarks: reason }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Reject failed');
-      setMessage('Request rejected.');
+      if (directMode && data.results?.some((result) => !result.success)) {
+        throw new Error(data.results.find((result) => !result.success)?.error || 'Unable to reject this request.');
+      }
+      setActionPopup({ title: 'Action completed', message: 'Request rejected.' });
       setExpandedId(null);
       await loadData();
     } catch (err) {
-      setMessage(err.message || 'Reject failed');
+      setActionPopup({ title: 'Action failed', message: err.message || 'Reject failed', isError: true });
     }
   }
 
   const approvedByList = activeRequest ? normalizeApproverList(activeRequest.ApprovedBy) : [];
-  const isActionableRequest = Boolean(activeRequest && !['APPROVED', 'REJECTED'].includes(String(activeRequest.Status || '').toUpperCase()));
+  const isActionableRequest = Boolean(
+    activeTab === 'pending'
+    && activeRequest
+    && !['APPROVED', 'REJECTED'].includes(String(activeRequest.Status || '').toUpperCase())
+  );
+
+  if (directMode && directLinkUnavailable) return null;
 
   return (
-    <div className="dashboardPage leaveFitScreenRoot">
+    <div className={`dashboardPage leaveFitScreenRoot${directMode ? ' directApprovalPage' : ''}`}>
       <div className="dashboardBlob dashboardBlobOne" />
       <div className="dashboardBlob dashboardBlobTwo" />
 
@@ -217,57 +356,46 @@ export default function LeaveApprovalsPage() {
           className={`leaveTabButton ${activeTab === 'pending' ? 'leaveTabButtonActive' : ''}`}
           onClick={() => setActiveTab('pending')}
         >
-          New Leave Requests
+          New leave requests
         </button>
         <button
           type="button"
           className={`leaveTabButton ${activeTab === 'approved' ? 'leaveTabButtonActive' : ''}`}
           onClick={() => setActiveTab('approved')}
         >
-          Approved Leaves
+          Approved leaves
         </button>
       </div>
-
-      {activeTab === 'approved' && (
-        <div className="leaveFilterBar">
-          <select
-            className="leaveFilterSelect"
-            value={monthFilter}
-            onChange={(e) => setMonthFilter(e.target.value)}
-          >
-            <option value="all">All Months</option>
-            {MONTH_NAMES.map((m, i) => (
-              <option key={m} value={i}>{m}</option>
-            ))}
-          </select>
-          <input
-            className="leaveFilterSelect"
-            type="number"
-            min="1900"
-            step="1"
-            value={yearFilter}
-            onChange={(e) => setYearFilter(e.target.value)}
-            placeholder="Year"
-          />
-        </div>
-      )}
 
       <div className="leaveApprovalMessageWrap">
         {message && <p className="leaveApprovalMessage">{message}</p>}
       </div>
+
+        {actionPopup && (
+          <div className="leaveActionPopupOverlay" role="presentation">
+            <section
+              className={`leaveActionPopup${actionPopup.isError ? ' leaveActionPopupError' : ''}`}
+              role="status"
+              aria-live={actionPopup.isError ? 'assertive' : 'polite'}
+            >
+              <h2>{actionPopup.title}</h2>
+              <p>{actionPopup.message}</p>
+            </section>
+          </div>
+        )}
 
       {loading ? (
         <p className="leaveLoadingText">Loading...</p>
       ) : (
         <>
           {activeTab === 'pending' && (
-            <div className="leaveTableCard">
-              <h2>New Leave Requests</h2>
+            <div className="leaveTableCard leavePendingCard">
+              <h2>New leave requests</h2>
               {pendingApprovals.length === 0 ? (
                 <p>No pending approvals.</p>
               ) : (
                 <>
-                  <div className="leaveTableScrollWrapper">
+                  <div className="leaveTableScrollWrapper leavePendingTableScrollWrapper">
                     <table className="leaveNoScrollTable">
                       <thead>
                         <tr>
@@ -278,20 +406,23 @@ export default function LeaveApprovalsPage() {
                               onChange={selectAllToggle}
                             />
                           </th>
-                          <th>Applicant ID</th>
-                          <th>Applicant Name</th>
-                          <th>Department</th>
+                          <th>Action</th>
+                          <th>Emp ID</th>
+                          <th>Emp Name</th>
+                          <th>Dept</th>
                           <th>Section</th>
                           <th>Date Applied</th>
+                          <th>Start Date</th>
+                          <th>End Date</th>
                           <th>From Time</th>
                           <th>To Time</th>
                           <th>Days</th>
                           <th>Leave Type</th>
-                          <th>Reason</th>
-                          <th>Attachment</th>
-                          <th>Current Approver</th>
                           <th>Status</th>
-                          <th>Action</th>
+                          <th>VPre Status</th>
+                          <th>Pre Status</th>
+                          <th>Reason</th>
+                          <th>Current Approver</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -300,7 +431,16 @@ export default function LeaveApprovalsPage() {
                     </table>
                   </div>
                   <div className="leaveBulkActionsRow">
-                    <button className="applyLeaveButton" disabled={selectedIds.size === 0} onClick={() => handleBulkAction('APPROVED')}>Approve Selected</button>
+                    <button className="applyLeaveButton leaveBulkApproveButton" disabled={selectedIds.size === 0} onClick={() => handleBulkAction('APPROVED')}>Approve Selected</button>
+                    {directMode && (
+                      <button
+                        className="applyLeaveButton leaveBulkRejectButton"
+                        disabled={selectedIds.size === 0}
+                        onClick={handleRejectSelected}
+                      >
+                        Reject Selected
+                      </button>
+                    )}
                   </div>
                 </>
               )}
@@ -309,28 +449,66 @@ export default function LeaveApprovalsPage() {
 
           {activeTab === 'approved' && (
             <div className="leaveTableCard leaveApprovedCard">
-              <h2>Approved Leaves</h2>
+              <div className="leaveApprovedCardHeader">
+                <h2>Approved leaves</h2>
+                <div className="leaveFilterBar">
+                  <input
+                    className="leaveFilterSelect leaveApprovedSearch"
+                    type="search"
+                    value={approvedSearch}
+                    onChange={(e) => setApprovedSearch(e.target.value)}
+                    placeholder="Search approved leaves"
+                    aria-label="Search approved leaves"
+                  />
+                  <select
+                    className="leaveFilterSelect"
+                    value={monthFilter}
+                    onChange={(e) => setMonthFilter(e.target.value)}
+                  >
+                    <option value="all">All Months</option>
+                    {MONTH_NAMES.map((m, i) => (
+                      <option key={m} value={i}>{m}</option>
+                    ))}
+                  </select>
+                  <input
+                    className="leaveFilterSelect"
+                    type="number"
+                    min="1900"
+                    step="1"
+                    value={yearFilter}
+                    onChange={(e) => setYearFilter(e.target.value)}
+                    placeholder="Year"
+                  />
+                </div>
+              </div>
               {filteredApproved.length === 0 ? (
-                <p>No approved requests yet.</p>
+                <p>
+                  {approvedRequests.length === 0
+                    ? 'No approved requests yet.'
+                    : 'No approved requests match these filters.'}
+                </p>
               ) : (
-                <div className="leaveTableScrollWrapper">
+                <div className="leaveTableScrollWrapper leaveApprovedTableScrollWrapper">
                   <table className="leaveNoScrollTable">
                     <thead>
                       <tr>
-                        <th>Applicant ID</th>
-                        <th>Applicant Name</th>
-                        <th>Department</th>
+                        <th>Emp ID</th>
+                        <th>Action</th>
+                        <th>Emp Name</th>
+                        <th>Dept</th>
                         <th>Section</th>
                         <th>Date Applied</th>
+                        <th>Start Date</th>
+                        <th>End Date</th>
                         <th>From Time</th>
                         <th>To Time</th>
                         <th>Days</th>
                         <th>Leave Type</th>
-                        <th>Reason</th>
-                        <th>Attachment</th>
-                        <th>Current Approver</th>
                         <th>Status</th>
-                        <th>Action</th>
+                        <th>VPre Status</th>
+                        <th>Pre Status</th>
+                        <th>Reason</th>
+                        <th>Current Approver</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -441,16 +619,14 @@ export default function LeaveApprovalsPage() {
                 </div>
 
                 <div className="leaveDetailRow">
-                  <div className="leaveDetailCell leaveDetailCellLabel">HoD Approval :-</div>
-                  <div className="leaveDetailCell leaveDetailCellValue">{activeRequest.HodApproval || '-'}</div>
                   <div className="leaveDetailCell leaveDetailCellLabel">HoD Status :-</div>
-                  <div className="leaveDetailCell leaveDetailCellValue">{activeRequest.HodStatus || 'PENDING'}</div>
-                </div>
-                <div className="leaveDetailRow">
-                  <div className="leaveDetailCell leaveDetailCellLabel">CCC Approval :-</div>
-                  <div className="leaveDetailCell leaveDetailCellValue">{activeRequest.CccApproval || '-'}</div>
+                  <div className={`leaveDetailCell leaveDetailCellValue ${getApprovalStatusClass(activeRequest.HodStatus)}`}>
+                    {formatApprovalStatus(activeRequest.HodStatus, activeRequest.HodApproval)}
+                  </div>
                   <div className="leaveDetailCell leaveDetailCellLabel">CCC Status :-</div>
-                  <div className="leaveDetailCell leaveDetailCellValue">{activeRequest.CccStatus || 'PENDING'}</div>
+                  <div className={`leaveDetailCell leaveDetailCellValue ${getApprovalStatusClass(activeRequest.CccStatus)}`}>
+                    {formatApprovalStatus(activeRequest.CccStatus, activeRequest.CccApproval)}
+                  </div>
                 </div>
               </div>
 

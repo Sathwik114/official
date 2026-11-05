@@ -30,13 +30,14 @@ export default function AllLeavesTable({ leaves = [] }) {
             <th>V/P status</th>
             <th>P status</th>
             <th>Leave Type</th>
+            <th>Attachment</th>
             <th>Reason</th>
           </tr>
         </thead>
         <tbody>
           {leaves.length === 0 ? (
             <tr>
-              <td colSpan={13} className="allLeavesEmptyCell">
+              <td colSpan={14} className="allLeavesEmptyCell">
                 No leave requests found.
               </td>
             </tr>
@@ -66,6 +67,19 @@ export default function AllLeavesTable({ leaves = [] }) {
                   <td>{leave.HodStatus || '-'}</td>
                   <td>{leave.CccStatus || '-'}</td>
                   <td>{leave.LeaveType || '-'}</td>
+                  <td>
+                    {leave.HasAttachment ? (
+                      <a
+                        className="viewFormLink"
+                        href={`/api/leave/document/${encodeURIComponent(leave.TranId)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        View
+                      </a>
+                    ) : '-'}
+                  </td>
                   <td className="allLeavesReasonCell">
                     <span className="allLeavesReasonText">{leave.Reason || '-'}</span>
                   </td>

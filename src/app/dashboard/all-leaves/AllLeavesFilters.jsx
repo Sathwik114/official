@@ -55,17 +55,6 @@ export default function AllLeavesFilters({ leaves = [] }) {
     updateParams(year, value);
   };
 
-  const handleClear = () => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    setYear(DEFAULT_YEAR);
-    setMonth(DEFAULT_MONTH);
-    const paramsObj = new URLSearchParams(searchParams.toString());
-    paramsObj.set('year', DEFAULT_YEAR);
-    paramsObj.set('month', DEFAULT_MONTH);
-    paramsObj.delete('leaveType');
-    router.replace(`${pathname}?${paramsObj.toString()}`);
-  };
-
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -118,9 +107,6 @@ export default function AllLeavesFilters({ leaves = [] }) {
     }
   }
 
-  const isFiltered =
-    year !== DEFAULT_YEAR || month !== DEFAULT_MONTH || searchParams.get('leaveType');
-
   return (
     <div className="allLeavesFilters">
       <div className="filterGroup">
@@ -153,12 +139,6 @@ export default function AllLeavesFilters({ leaves = [] }) {
         <label htmlFor="leaveType">Leave Type</label>
         <LeaveTypeColumnFilter />
       </div>
-
-      {isFiltered && (
-        <button type="button" className="filterClearBtn" onClick={handleClear}>
-          Clear
-        </button>
-      )}
 
       <button
         type="button"

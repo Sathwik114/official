@@ -5,12 +5,6 @@ import { useEffect, useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { formatCalendarDate, getCalendarDateParts } from '@/lib/leaveDateUtils';
 
-function truncateReason(reason) {
-  if (!reason) return '-';
-  if (reason.length <= 10) return reason;
-  return reason.slice(0, 10) + '...';
-}
-
 function formatDisplayDate(value) {
   return formatCalendarDate(value);
 }
@@ -21,6 +15,14 @@ function formatStatus(value) {
   if (/^accept(ed)?$/i.test(normalized)) return 'Accept';
   if (/^reject(ed)?$/i.test(normalized)) return 'Reject';
   return normalized;
+}
+
+function getStatusClass(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (!normalized || normalized === 'PENDING' || normalized === 'WAITING') return 'leaveApprovalStatusWaiting';
+  if (normalized === 'ACCEPT' || normalized === 'ACCEPTED' || normalized === 'APPROVED') return 'leaveApprovalStatusAccepted';
+  if (normalized === 'REJECT' || normalized === 'REJECTED') return 'leaveApprovalStatusRejected';
+  return '';
 }
 
 const CUTOFF_DATE = new Date('2026-09-30T23:59:59.999Z');
@@ -45,7 +47,10 @@ export default function MyLeavesPage() {
   const [loading, setLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState('');
   const [monthFilter, setMonthFilter] = useState('');
+  const [leaveFilter, setLeaveFilter] = useState('');
+  const [filterMode, setFilterMode] = useState('');
   const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
+  const [selectedRequestId, setSelectedRequestId] = useState(null);
 
   useEffect(() => {
     async function loadData() {
@@ -66,18 +71,6 @@ export default function MyLeavesPage() {
     loadData();
   }, []);
 
-  const yearOptions = useMemo(() => {
-    const years = new Set();
-    myRequests.forEach((request) => {
-      const requestDateValue = request.DateApplied || request.CreatedAt || request.StartDate;
-      if (!requestDateValue) return;
-      const requestDate = getCalendarDateParts(requestDateValue);
-      if (!requestDate) return;
-      years.add(requestDate.year);
-    });
-    return Array.from(years).sort((a, b) => b - a);
-  }, [myRequests]);
-
   const filteredRequests = useMemo(() => {
       return myRequests
         .filter((request) => {
@@ -93,6 +86,16 @@ export default function MyLeavesPage() {
           if (monthFilter && String(requestDate.month).padStart(2, '0') !== monthFilter) {
             return false;
           }
+          if (leaveFilter) {
+            const requestLeaveType = String(request.LeaveType || '').trim().toUpperCase();
+            const selectedLeaveType = leaveFilter.toUpperCase();
+            const matchesLeaveType = selectedLeaveType === '1HOUR'
+              ? ['1HOUR', 'P/7H'].includes(requestLeaveType)
+              : requestLeaveType === selectedLeaveType
+                || requestLeaveType.startsWith(`${selectedLeaveType}/`)
+                || requestLeaveType.endsWith(`/${selectedLeaveType}`);
+            if (!matchesLeaveType) return false;
+          }
           if (yearFilter && String(requestDate.year) !== yearFilter) {
             return false;
           }
@@ -103,12 +106,21 @@ export default function MyLeavesPage() {
           const dateB = new Date(b.DateApplied || b.CreatedAt || b.StartDate);
           return dateB - dateA; // newest first
         });
-    }, [myRequests, dateFilter, monthFilter, yearFilter]);
+    }, [myRequests, dateFilter, monthFilter, leaveFilter, yearFilter]);
 
-  const hasActiveFilters = dateFilter || monthFilter || yearFilter;
+  const hasActiveFilters = dateFilter || monthFilter || leaveFilter || yearFilter;
+  const handleFilterModeChange = (event) => {
+    const nextMode = event.target.value;
+    setFilterMode(nextMode);
+    setDateFilter('');
+    setMonthFilter('');
+    setLeaveFilter('');
+  };
+
   const clearAllFilters = () => {
     setDateFilter('');
     setMonthFilter('');
+    setLeaveFilter('');
     setYearFilter('');
   };
 
@@ -131,21 +143,21 @@ export default function MyLeavesPage() {
 
   const handleExportExcel = () => {
     const exportRows = filteredRequests.map((request, index) => ({
-      'S.No': totalRows - index,
-      'Date Applied': formatDisplayDate(request.DateApplied || request.CreatedAt || request.StartDate),
-      'Applicant ID': request.ApplicantId || '-',
-      'Applicant Name': request.ApplicantName || '-',
-      'Department': request.Department || '-',
+      'No.': totalRows - index,
+      'Emp ID': request.ApplicantId || '-',
+      'Emp Name': request.ApplicantName || '-',
+      'Dept': request.Department || '-',
       'Section': request.Section || '-',
       'Leave Type': request.LeaveType || '-',
+      'Start Date': formatDisplayDate(request.StartDate || request.FromDate),
+      'End Date': formatDisplayDate(request.EndDate || request.ToDate),
       'From Time': request.FromTime || '-',
       'To Time': request.ToTime || '-',
       'Total Days': resolveTotalDays(request),
-      'Reason': request.Reason || '-',
-      'HOD Status': formatStatus(request.HodStatus),
-      'CCC Status': formatStatus(request.CccStatus),
+      'VPre Aprvl': formatStatus(request.HodStatus),
+      'Pre Aprvl': formatStatus(request.CccStatus),
       'Attachment': request.AttachmentName || '-',
-      'Current Approver': request.CurrentApproverId || request.CurrentApprover || '-',
+      'Reason': request.Reason || '-',
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(exportRows);
@@ -157,56 +169,86 @@ export default function MyLeavesPage() {
   };
 
   return (
-    <div className="dashboardPage">
+    <div className="dashboardPage myLeavesPage">
       <div className="dashboardBlob dashboardBlobOne" />
       <div className="dashboardBlob dashboardBlobTwo" />
 
-      <div className="dashboardHeader">
-        <h1 className="dashboardHeaderTitle">My Leaves</h1>
-      </div>
-
       <div className="dashboardAttendance">
         <div className="tableFilterBar">
-          <label htmlFor="dateFilter">Filter by Date:</label>
-          <input
-            type="date"
-            id="dateFilter"
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-          />
+          <h1 className="dashboardHeaderTitle">My Leaves</h1>
 
-          <label htmlFor="monthFilter">Month:</label>
+          <label htmlFor="filterMode">Filter by:</label>
           <select
-            id="monthFilter"
-            value={monthFilter}
-            onChange={(e) => setMonthFilter(e.target.value)}
+            id="filterMode"
+            value={filterMode}
+            onChange={handleFilterModeChange}
           >
-            <option value="">All</option>
-            {monthOptions.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
+            <option value="">Select filter</option>
+            <option value="date">Date</option>
+            <option value="month">Month</option>
+            <option value="leave">Leave type</option>
           </select>
+
+          {filterMode === 'date' && (
+            <>
+              <label htmlFor="dateFilter">Date:</label>
+              <input
+                type="date"
+                id="dateFilter"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+              />
+            </>
+          )}
+
+          {filterMode === 'month' && (
+            <>
+              <label htmlFor="monthFilter">Month:</label>
+              <select
+                id="monthFilter"
+                value={monthFilter}
+                onChange={(e) => setMonthFilter(e.target.value)}
+              >
+                <option value="">All</option>
+                {monthOptions.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
+
+          {filterMode === 'leave' && (
+            <>
+              <label htmlFor="leaveFilter">Leave type:</label>
+              <select
+                id="leaveFilter"
+                value={leaveFilter}
+                onChange={(e) => setLeaveFilter(e.target.value)}
+              >
+                <option value="">All</option>
+                <option value="EL">EL</option>
+                <option value="SL">SL</option>
+                <option value="OD">OD</option>
+                <option value="LWP">LWP</option>
+                <option value="1Hour">1 hour</option>
+                <option value="COFF">COFF</option>
+              </select>
+            </>
+          )}
 
           <label htmlFor="yearFilter">Year:</label>
           <input
             type="text"
             id="yearFilter"
-            list="yearOptionsList"
             inputMode="numeric"
-            pattern="[0-9]*"
             maxLength={4}
-            placeholder="e.g. 2026"
             value={yearFilter}
-            onChange={(e) => setYearFilter(e.target.value.replace(/[^0-9]/g, ''))}
+            onChange={(e) => setYearFilter(e.target.value.replace(/\D/g, ''))}
             className="yearFilterInput"
+            aria-label="Filter by year"
           />
-          <datalist id="yearOptionsList">
-            {yearOptions.map((y) => (
-              <option key={y} value={y} />
-            ))}
-          </datalist>
 
           {hasActiveFilters && (
             <button type="button" onClick={clearAllFilters} className="clearFilterBtn">
@@ -233,39 +275,44 @@ export default function MyLeavesPage() {
             <table className="attendanceTable">
               <thead>
                 <tr>
-                  <th>S.No</th>
-                  <th>Date Applied</th>
-                  <th>Applicant ID</th>
-                  <th>Applicant Name</th>
-                  <th>Department</th>
+                  <th>No.</th>
+                  <th>Emp ID</th>
+                  <th>Emp Name</th>
+                  <th>Dept</th>
                   <th>Section</th>
                   <th>Leave Type</th>
+                  <th>Start Date</th>
+                  <th>End Date</th>
                   <th>From Time</th>
                   <th>To Time</th>
                   <th>Total Days</th>
-                  <th>Reason</th>
-                  <th>Vice President Approval</th>
-                  <th>President Approval</th>
+                  <th>VPre Aprvl</th>
+                  <th>Pre Aprvl</th>
                   <th>Attachment</th>
-                  <th>Current Approver</th>
+                  <th>Reason</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredRequests.map((request, index) => (
-                  <tr key={request.Id}>
+                  <tr
+                    key={request.Id}
+                    className={selectedRequestId === String(request.Id) ? 'selectedLeaveRow' : ''}
+                    aria-selected={selectedRequestId === String(request.Id)}
+                    onClick={() => setSelectedRequestId(String(request.Id))}
+                  >
                     <td>{totalRows - index}</td>
-                    <td>{formatDisplayDate(request.DateApplied || request.CreatedAt || request.StartDate)}</td>
                     <td>{request.ApplicantId || '-'}</td>
                     <td>{request.ApplicantName || '-'}</td>
                     <td>{request.Department || '-'}</td>
                     <td>{request.Section || '-'}</td>
                     <td>{request.LeaveType}</td>
+                    <td>{formatDisplayDate(request.StartDate || request.FromDate)}</td>
+                    <td>{formatDisplayDate(request.EndDate || request.ToDate)}</td>
                     <td>{request.FromTime || '-'}</td>
                     <td>{request.ToTime || '-'}</td>
                     <td>{resolveTotalDays(request)}</td>
-                    <td title={request.Reason || ''}>{truncateReason(request.Reason)}</td>
-                    <td>{formatStatus(request.HodStatus)}</td>
-                    <td>{formatStatus(request.CccStatus)}</td>
+                    <td className={getStatusClass(request.HodStatus)}>{formatStatus(request.HodStatus)}</td>
+                    <td className={getStatusClass(request.CccStatus)}>{formatStatus(request.CccStatus)}</td>
                     <td>
                       {request.TranId && request.AttachmentName ? (
                         <a
@@ -280,7 +327,9 @@ export default function MyLeavesPage() {
                         request.AttachmentName || '-'
                       )}
                     </td>
-                    <td>{request.CurrentApproverId || request.CurrentApprover || '-'}</td>
+                    <td className="leaveReasonCell" title={request.Reason || ''}>
+                      <span className="leaveReasonText">{request.Reason || '-'}</span>
+                    </td>
                   </tr>
                 ))}
               </tbody>

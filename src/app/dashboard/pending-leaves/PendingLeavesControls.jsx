@@ -60,14 +60,6 @@ export default function PendingLeavesControls({ leaves = [] }) {
     updateUrl(year, month, value);
   }
 
-  function handleClear() {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    setYear(DEFAULT_YEAR);
-    setMonth(DEFAULT_MONTH);
-    setStatus('');
-    updateUrl(DEFAULT_YEAR, DEFAULT_MONTH, '');
-  }
-
   async function handleDownloadExcel() {
     if (!leaves.length) return;
 
@@ -109,8 +101,6 @@ export default function PendingLeavesControls({ leaves = [] }) {
     }
   }
 
-  const isFiltered = year !== DEFAULT_YEAR || month !== DEFAULT_MONTH || status;
-
   return (
     <div className="pendingLeavesFilterBar">
       <div className="pendingLeavesFilterField">
@@ -142,16 +132,6 @@ export default function PendingLeavesControls({ leaves = [] }) {
           <option value="PRESIDENT">President Status</option>
         </select>
       </div>
-
-      {isFiltered && (
-        <button
-          type="button"
-          className="pendingLeavesClearButton"
-          onClick={handleClear}
-        >
-          Clear
-        </button>
-      )}
 
       <button
         type="button"

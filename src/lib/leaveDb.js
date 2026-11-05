@@ -1,5 +1,5 @@
 import sql from 'mssql';
-import { getEmployeeDetails as getPayrollEmployeeDetails } from './payrollDb';
+import { getEmployeeDetails as getPayrollEmployeeDetails, getEmployeeDetailsForIds } from './payrollDb';
 import { getAttendanceTimesForDate, getMorningLateByForDate, getLegacyLeaveRequestsForApplicant } from './attendanceDb';
 
 export const CUTOFF_DATE_STR = '2026-09-30T23:59:59.999Z';
@@ -358,6 +358,63 @@ export async function ensureLeaveTables() {
     IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'LeaveApprovals' AND COLUMN_NAME = 'ApproverId' AND DATA_TYPE <> 'nvarchar')
       ALTER TABLE dbo.LeaveApprovals ALTER COLUMN ApproverId NVARCHAR(100) NOT NULL;
 
+    IF OBJECT_ID(N'dbo.ApprovalTimings', N'U') IS NULL
+    BEGIN
+      CREATE TABLE dbo.ApprovalTimings (
+        LeaveRequestId INT NOT NULL PRIMARY KEY,
+        TranId BIGINT NULL,
+        EmpCode NVARCHAR(100) NOT NULL,
+        EmpName NVARCHAR(200) NULL,
+        LeaveType NVARCHAR(100) NOT NULL,
+        StartDate DATETIME NOT NULL,
+        EndDate DATETIME NOT NULL,
+        Reason NVARCHAR(MAX) NOT NULL,
+        Department NVARCHAR(200) NULL,
+        Section NVARCHAR(200) NULL,
+        VicePresidentApproveStatus NVARCHAR(50) NOT NULL DEFAULT 'Pending',
+        VicePresidentApprovedAt DATETIME NULL,
+        PresidentStatus NVARCHAR(50) NOT NULL DEFAULT 'Pending',
+        PresidentApprovedAt DATETIME NULL,
+        CreatedAt DATETIME NOT NULL DEFAULT GETDATE()
+      );
+    END;
+
+    IF OBJECT_ID(N'dbo.DirectApprovalTokens', N'U') IS NULL
+    BEGIN
+      CREATE TABLE dbo.DirectApprovalTokens (
+        TokenHash BINARY(32) NOT NULL PRIMARY KEY,
+        ApproverId NVARCHAR(100) NOT NULL,
+        TranId BIGINT NULL,
+        EmpCode NVARCHAR(100) NULL,
+        EmpName NVARCHAR(200) NULL,
+        StartDate DATETIME NULL,
+        EndDate DATETIME NULL,
+        LeaveType NVARCHAR(100) NULL,
+        CreatedAt DATETIME NOT NULL DEFAULT GETDATE(),
+        RevokedAt DATETIME NULL
+      );
+      CREATE INDEX IX_DirectApprovalTokens_ApproverId
+        ON dbo.DirectApprovalTokens (ApproverId, RevokedAt);
+    END;
+
+    IF COL_LENGTH('dbo.DirectApprovalTokens', 'TranId') IS NULL
+      ALTER TABLE dbo.DirectApprovalTokens ADD TranId BIGINT NULL;
+    IF COL_LENGTH('dbo.DirectApprovalTokens', 'EmpCode') IS NULL
+      ALTER TABLE dbo.DirectApprovalTokens ADD EmpCode NVARCHAR(100) NULL;
+    IF COL_LENGTH('dbo.DirectApprovalTokens', 'EmpName') IS NULL
+      ALTER TABLE dbo.DirectApprovalTokens ADD EmpName NVARCHAR(200) NULL;
+    IF COL_LENGTH('dbo.DirectApprovalTokens', 'StartDate') IS NULL
+      ALTER TABLE dbo.DirectApprovalTokens ADD StartDate DATETIME NULL;
+    IF COL_LENGTH('dbo.DirectApprovalTokens', 'EndDate') IS NULL
+      ALTER TABLE dbo.DirectApprovalTokens ADD EndDate DATETIME NULL;
+    IF COL_LENGTH('dbo.DirectApprovalTokens', 'LeaveType') IS NULL
+      ALTER TABLE dbo.DirectApprovalTokens ADD LeaveType NVARCHAR(100) NULL;
+
+    UPDATE dbo.DirectApprovalTokens
+    SET RevokedAt = DATEADD(DAY, 40, CreatedAt)
+    WHERE RevokedAt IS NULL
+      OR RevokedAt > GETDATE();
+
     IF OBJECT_ID(N'dbo.AllLeaveRequests', N'U') IS NULL
     BEGIN
       CREATE TABLE dbo.AllLeaveRequests (
@@ -444,6 +501,62 @@ export async function ensureLeaveTables() {
     ELSE
       EXEC(N'ALTER TRIGGER dbo.trg_AllLeaveRequests_Insert_OnlineLeaveEntry_AttmSystem' + @LeaveEntryTriggerBody);
   `);
+}
+
+export async function storeDirectApprovalToken(approverId, tokenHash, leaveRequest) {
+  await ensureLeaveTables();
+  const pool = await getPool();
+  await pool.request()
+    .input('ApproverId', sql.NVarChar(100), String(approverId || '').trim())
+    .input('TokenHash', sql.Binary(32), tokenHash)
+    .input('TranId', sql.BigInt, leaveRequest?.TranId ? String(leaveRequest.TranId) : null)
+    .input('EmpCode', sql.NVarChar(100), String(leaveRequest?.EmpCode || '').trim() || null)
+    .input('EmpName', sql.NVarChar(200), String(leaveRequest?.EmpName || '').trim() || null)
+    .input('StartDate', sql.DateTime, leaveRequest?.StartDate || null)
+    .input('EndDate', sql.DateTime, leaveRequest?.EndDate || null)
+    .input('LeaveType', sql.NVarChar(100), String(leaveRequest?.LeaveType || '').trim() || null)
+    .query(`
+      INSERT INTO dbo.DirectApprovalTokens (
+        TokenHash, ApproverId, TranId, EmpCode, EmpName, StartDate, EndDate,
+        LeaveType, RevokedAt
+      )
+      VALUES (
+        @TokenHash, @ApproverId, @TranId, @EmpCode, @EmpName, @StartDate, @EndDate,
+        @LeaveType, DATEADD(DAY, 40, GETDATE())
+      );
+    `);
+}
+
+export async function getApproverForDirectApprovalToken(tokenHash) {
+  await ensureLeaveTables();
+  const pool = await getPool();
+  const result = await pool.request()
+    .input('TokenHash', sql.Binary(32), tokenHash)
+    .query(`
+      SELECT TOP 1 ApproverId
+      FROM dbo.DirectApprovalTokens
+      WHERE TokenHash = @TokenHash
+        AND RevokedAt > GETDATE();
+    `);
+
+  return String(result.recordset[0]?.ApproverId || '').trim() || null;
+}
+
+export async function revokeDirectApprovalTokensForApprover(approverId) {
+  await ensureLeaveTables();
+  const pool = await getPool();
+  const result = await pool.request()
+    .input('ApproverId', sql.NVarChar(100), String(approverId || '').trim())
+    .query(`
+      UPDATE dbo.DirectApprovalTokens
+      SET RevokedAt = GETDATE()
+      WHERE ApproverId = @ApproverId
+        AND RevokedAt > GETDATE();
+
+      SELECT @@ROWCOUNT AS RevokedCount;
+    `);
+
+  return result.recordset[0]?.RevokedCount || 0;
 }
 
 async function syncAcceptedLeaveRequestToArchive(leaveRequestId) {
@@ -595,6 +708,7 @@ export async function createLeaveRequest(payload) {
   await ensureLeaveTables();
   const pool = await getPool();
   const payrollEmployee = await getPayrollEmployeeDetails(payload.applicantId).catch(() => null);
+  const [employeeDisplayDetails] = await getEmployeeDetailsForIds([payload.applicantId]);
 
   // Only pull CAP In/Out time from AttmSystem when the leave type is COFF
   const attendanceTimes = String(payload.leaveType || '').toUpperCase().includes('COFF')
@@ -712,14 +826,40 @@ export async function createLeaveRequest(payload) {
       );
     `);
 
+  const savedLeaveRequest = result.recordset[0] || null;
+  if (!savedLeaveRequest) return null;
+
+  await pool.request()
+    .input('LeaveRequestId', sql.Int, savedLeaveRequest.Id)
+    .input('TranId', sql.BigInt, savedLeaveRequest.TranId || null)
+    .input('EmpCode', sql.NVarChar(100), savedLeaveRequest.ApplicantId)
+    .input('EmpName', sql.NVarChar(200), savedLeaveRequest.ApplicantName || '')
+    .input('LeaveType', sql.NVarChar(100), savedLeaveRequest.LeaveType)
+    .input('StartDate', sql.DateTime, savedLeaveRequest.StartDate)
+    .input('EndDate', sql.DateTime, savedLeaveRequest.EndDate)
+    .input('Reason', sql.NVarChar(sql.MAX), savedLeaveRequest.Reason || '')
+    .input('Department', sql.NVarChar(200), employeeDisplayDetails?.Department || savedLeaveRequest.Department || '')
+    .input('Section', sql.NVarChar(200), employeeDisplayDetails?.Section || savedLeaveRequest.Section || '')
+    .query(`
+      INSERT INTO dbo.ApprovalTimings (
+        LeaveRequestId, TranId, EmpCode, EmpName, LeaveType, StartDate, EndDate,
+        Reason, Department, Section, VicePresidentApproveStatus, PresidentStatus
+      )
+      VALUES (
+        @LeaveRequestId, @TranId, @EmpCode, @EmpName, @LeaveType, @StartDate, @EndDate,
+        @Reason, @Department, @Section, 'Pending', 'Pending'
+      );
+    `);
+
   // EL and SL balances are informational and are not changed by leave requests.
-  return result.recordset[0] || null;
+  return savedLeaveRequest;
 }
 
 export async function createLeaveRequestWithInitialApproval(payload, approverId) {
   await ensureLeaveTables();
   const pool = await getPool();
   const payrollEmployee = await getPayrollEmployeeDetails(payload.applicantId).catch(() => null);
+  const [employeeDisplayDetails] = await getEmployeeDetailsForIds([payload.applicantId]);
 
   // Only pull CAP In/Out time from AttmSystem when the leave type is COFF
   const attendanceTimes = String(payload.leaveType || '').toUpperCase().includes('COFF')
@@ -812,6 +952,28 @@ export async function createLeaveRequestWithInitialApproval(payload, approverId)
         VALUES (@LeaveRequestId, @ApproverId, @Decision, @Remarks, @StepNumber);
       `);
 
+    await transaction.request()
+      .input('LeaveRequestId', sql.Int, savedLeaveRequest.Id)
+      .input('TranId', sql.BigInt, savedLeaveRequest.TranId || null)
+      .input('EmpCode', sql.NVarChar(100), savedLeaveRequest.ApplicantId)
+      .input('EmpName', sql.NVarChar(200), savedLeaveRequest.ApplicantName || '')
+      .input('LeaveType', sql.NVarChar(100), savedLeaveRequest.LeaveType)
+      .input('StartDate', sql.DateTime, savedLeaveRequest.StartDate)
+      .input('EndDate', sql.DateTime, savedLeaveRequest.EndDate)
+      .input('Reason', sql.NVarChar(sql.MAX), savedLeaveRequest.Reason || '')
+      .input('Department', sql.NVarChar(200), employeeDisplayDetails?.Department || savedLeaveRequest.Department || '')
+      .input('Section', sql.NVarChar(200), employeeDisplayDetails?.Section || savedLeaveRequest.Section || '')
+      .query(`
+        INSERT INTO dbo.ApprovalTimings (
+          LeaveRequestId, TranId, EmpCode, EmpName, LeaveType, StartDate, EndDate,
+          Reason, Department, Section, VicePresidentApproveStatus, PresidentStatus
+        )
+        VALUES (
+          @LeaveRequestId, @TranId, @EmpCode, @EmpName, @LeaveType, @StartDate, @EndDate,
+          @Reason, @Department, @Section, 'Pending', 'Pending'
+        );
+      `);
+
     await transaction.commit();
 
     // Balance is NOT deducted here — it's deducted only when the request is
@@ -839,6 +1001,7 @@ export async function addLeaveApproval(leaveRequestId, approverId, decision, rem
 }
 
 export async function updateLeaveRequestStatus(leaveRequestId, currentApprover, status, approvedBy = null, stepNumber = 0) {
+  await ensureLeaveTables();
   const pool = await getPool();
 
   const result = await pool.request()
@@ -864,6 +1027,22 @@ export async function updateLeaveRequestStatus(leaveRequestId, currentApprover, 
           UpdatedAt = GETDATE()
       OUTPUT DELETED.Status AS PreviousStatus, INSERTED.Status AS NewStatus, INSERTED.CccStatus AS UpdatedCccStatus, INSERTED.ApplicantId, INSERTED.LeaveType, INSERTED.TotalDays
       WHERE Id = @LeaveRequestId;
+
+      IF @ApprovedBy IS NOT NULL AND @ApprovedBy <> '' AND @StepNumber = 1
+      BEGIN
+        UPDATE dbo.ApprovalTimings
+        SET VicePresidentApproveStatus = 'Accept',
+            VicePresidentApprovedAt = COALESCE(VicePresidentApprovedAt, GETDATE())
+        WHERE LeaveRequestId = @LeaveRequestId;
+      END;
+
+      IF @ApprovedBy IS NOT NULL AND @ApprovedBy <> '' AND @StepNumber = 2
+      BEGIN
+        UPDATE dbo.ApprovalTimings
+        SET PresidentStatus = 'Accept',
+            PresidentApprovedAt = COALESCE(PresidentApprovedAt, GETDATE())
+        WHERE LeaveRequestId = @LeaveRequestId;
+      END;
     `);
 
   const row = result.recordset[0];
@@ -876,6 +1055,7 @@ export async function updateLeaveRequestStatus(leaveRequestId, currentApprover, 
 }
 
 export async function updateLeaveRequestRejection(leaveRequestId, rejectedBy, reason, stepNumber = 0) {
+  await ensureLeaveTables();
   const pool = await getPool();
 
   await pool.request()
@@ -900,6 +1080,20 @@ export async function updateLeaveRequestRejection(leaveRequestId, rejectedBy, re
           CurrentApprover = '',
           UpdatedAt = GETDATE()
       WHERE Id = @LeaveRequestId;
+
+      IF @StepNumber = 1
+      BEGIN
+        UPDATE dbo.ApprovalTimings
+        SET VicePresidentApproveStatus = 'Rejected'
+        WHERE LeaveRequestId = @LeaveRequestId;
+      END;
+
+      IF @StepNumber = 2
+      BEGIN
+        UPDATE dbo.ApprovalTimings
+        SET PresidentStatus = 'Rejected'
+        WHERE LeaveRequestId = @LeaveRequestId;
+      END;
     `);
 
   await syncAcceptedLeaveRequestToArchive(leaveRequestId);
@@ -1006,6 +1200,26 @@ export async function getApprovedRequestsForApprover(approverId) {
 
   const requests = result.recordset || [];
   return enrichLeaveRequests(requests);
+}
+
+export async function addCurrentEmployeeDepartmentAndSection(requests) {
+  if (!requests.length) return requests;
+
+  const employees = await getEmployeeDetailsForIds(requests.map((request) => request.ApplicantId));
+  const employeesById = new Map(
+    employees.map((employee) => [String(employee.ApplicantId || '').trim(), employee])
+  );
+
+  return requests.map((request) => {
+    const employee = employeesById.get(String(request.ApplicantId || '').trim());
+    if (!employee) return request;
+
+    return {
+      ...request,
+      Department: employee.Department || request.Department || '',
+      Section: employee.Section || request.Section || '',
+    };
+  });
 }
 
 export async function getPendingApprovalsForUser(currentUserUsername) {
@@ -1275,4 +1489,3 @@ export async function hasDuplicateLeaveRequest(applicantId, startDate) {
 
   return (result.recordset[0]?.count || 0) > 0;
 }
-

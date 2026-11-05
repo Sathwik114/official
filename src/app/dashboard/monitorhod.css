@@ -5,12 +5,62 @@
   align-items: center;
   width: 100%;
   padding: 1.5rem 1rem;
-  background: linear-gradient(160deg, #fdf2f8 0%, #fce7f3 50%, #fbcfe8 100%);
+  background: #f1f5f9;
   box-sizing: border-box;
   position: relative;
 }
 
+html.monitorHodDocument,
+body.monitorHodDocument {
+  height: auto;
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #9ca3af #f1f1f1;
+  -ms-overflow-style: auto;
+}
+
+html.monitorHodDocument::-webkit-scrollbar,
+body.monitorHodDocument::-webkit-scrollbar {
+  display: block;
+  width: 6px;
+}
+
+html.monitorHodDocument::-webkit-scrollbar-thumb,
+body.monitorHodDocument::-webkit-scrollbar-thumb {
+  background: #9ca3af;
+  border: 1px solid #f1f1f1;
+  border-radius: 6px;
+}
+
+html.monitorHodDocument::-webkit-scrollbar-track,
+body.monitorHodDocument::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+body.monitorHodDocument .dashboardShell {
+  height: auto;
+  min-height: 100vh;
+  overflow: visible;
+}
+
+.dashboardPage.monitorHodPage {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: calc(100vh - 3.5rem);
+  overflow: visible;
+  align-items: stretch;
+}
+
+.monitorHodPage .dashboardAttendance {
+  flex: 0 0 auto;
+  min-height: auto;
+  overflow: visible;
+}
+
 .dashboardBlob {
+  display: none;
   position: absolute;
   border-radius: 50%;
   filter: blur(40px);
@@ -76,6 +126,45 @@
   gap: 1rem;
   flex-wrap: wrap;
   margin-bottom: 1rem;
+}
+
+.hodDetailFilterControls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.hodDetailFilterControls .downloadExcelButton {
+  margin-left: 0;
+}
+
+.attendancePageFilterBar {
+  flex-wrap: nowrap;
+  gap: 0.75rem;
+}
+
+.attendancePageControls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.attendancePageInfo {
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.9rem;
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
+.attendancePageFilterBar .attendanceExportActions {
+  flex-wrap: nowrap;
+  margin-left: 0;
 }
 
 .hodFilterField {
@@ -217,13 +306,13 @@
 }
 
 .attendanceTable thead th {
-  background: #503e3e;
+  background: #073b69;
   color: #ffffff;
   font-weight: 800;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  border-bottom: 3px solid #8a7461;
+  border-bottom: 3px solid #15598b;
   border-right: 1px solid rgba(255, 255, 255, 0.25);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
@@ -355,7 +444,7 @@
 
 .attendanceDetailWrapper::-webkit-scrollbar {
   display: block;
-  width: 12px;
+  width: 6px;
 }
 
 .attendanceDetailWrapper::-webkit-scrollbar-track {
@@ -364,7 +453,7 @@
 
 .attendanceDetailWrapper::-webkit-scrollbar-thumb {
   background: #9ca3af;
-  border: 3px solid #f1f1f1;
+  border: 1px solid #f1f1f1;
   border-radius: 6px;
 }
 
@@ -420,6 +509,21 @@
   flex-wrap: wrap;
 }
 
+@media (max-width: 1000px) {
+  .attendancePageFilterBar {
+    flex-wrap: wrap;
+  }
+
+  .attendancePageControls {
+    margin-left: auto;
+  }
+
+  .attendancePageInfo {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}
+
 .downloadExcelButton:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 10px 18px -6px rgba(16, 185, 129, 0.5);
@@ -471,12 +575,24 @@
 
 /* Leave header info: Empcode / Empname / Department / Section */
 .leaveInfoGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(220px, 1fr));
-  gap: 0.6rem 1.5rem;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.85rem;
   margin-bottom: 1rem;
   font-size: 13.5px;
   color: #334155;
+}
+
+.leaveInfoGrid > div {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.leaveInfoGrid .hodHighlightValue {
+  padding: 0.12rem 0.4rem;
 }
 
 .leaveInfoGrid strong {
@@ -501,18 +617,33 @@
 }
 
 .leaveDetailWrapper {
+  width: 100%;
   max-height: 546px;
   flex: 0 1 auto;
   min-height: 0;
-  overflow-y: scroll;
+  overflow-x: auto;
+  overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: #9ca3af #f1f1f1;
   -ms-overflow-style: auto;
 }
 
+.leaveRecordsTableWrapper {
+  width: 100%;
+  max-width: 100%;
+}
+
+.leaveDetailTable {
+  width: max-content;
+  min-width: 100%;
+  max-width: none;
+  table-layout: auto;
+}
+
 .leaveDetailWrapper::-webkit-scrollbar {
   display: block;
-  width: 12px;
+  width: 6px;
+  height: 6px;
 }
 
 .leaveDetailWrapper::-webkit-scrollbar-track {
@@ -521,7 +652,7 @@
 
 .leaveDetailWrapper::-webkit-scrollbar-thumb {
   background: #9ca3af;
-  border: 3px solid #f1f1f1;
+  border: 1px solid #f1f1f1;
   border-radius: 6px;
 }
 
@@ -544,7 +675,12 @@
 .leaveDetailTable th:nth-child(7),
 .leaveDetailTable td:nth-child(7) { width: 10%; } /* No. of Days */
 .leaveDetailTable th:nth-child(8),
-.leaveDetailTable td:nth-child(8) { width: 32%; } /* Reason */
+.leaveDetailTable td:nth-child(8) {
+  width: max-content;
+  min-width: 0;
+  max-width: none;
+  white-space: nowrap;
+}
 
 .leaveDetailTable th:nth-child(8),
 .leaveDetailTable td:nth-child(8) {

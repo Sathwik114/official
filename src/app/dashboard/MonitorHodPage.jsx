@@ -42,55 +42,17 @@ export default function MonitorHodPage({ hodList = [] }) {
   const [year, setYear] = useState(new Date().getFullYear());
   const [exporting, setExporting] = useState(false);
   const [exportingLeave, setExportingLeave] = useState(false);
+  const leaveHeaderEmployee = hodProfiles[selectedEmpCode];
 
-  async function loadAttendance(empcode) {
-    if (!empcode) return;
+  useEffect(() => {
+    document.documentElement.classList.add('monitorHodDocument');
+    document.body.classList.add('monitorHodDocument');
 
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/employee?empcode=${empcode}&month=${month}&year=${year}&monitor=true`);
-      const data = await res.json();
-      if (res.ok && data.attendance) {
-        setAttendance(sortAttendanceAsc(data.attendance));
-        setSelectedEmployee(data.employee || null);
-      } else {
-        setAttendance([]);
-        setSelectedEmployee(null);
-      }
-    } catch (err) {
-      console.error('Failed to load attendance:', err);
-      setAttendance([]);
-      setSelectedEmployee(null);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Loads OnlineLeaveEntry records for the employee, filtered by year.
-  // Header info (Empname/Department/Section) comes from the payroll
-  // EmpMast lookup, not from the OnlineLeaveEntry rows.
-  async function loadLeave(empcode) {
-    if (!empcode) return;
-
-    setLeaveLoading(true);
-    try {
-      const res = await fetch(`/api/leave-history?empcode=${encodeURIComponent(empcode)}&year=${year}`);
-      const data = await res.json();
-      if (res.ok) {
-        setLeaveRecords(sortLeaveDesc(data.leave || []));
-        setLeaveEmployee(data.employee || null);
-      } else {
-        setLeaveRecords([]);
-        setLeaveEmployee(null);
-      }
-    } catch (err) {
-      console.error('Failed to load leave records:', err);
-      setLeaveRecords([]);
-      setLeaveEmployee(null);
-    } finally {
-      setLeaveLoading(false);
-    }
-  }
+    return () => {
+      document.documentElement.classList.remove('monitorHodDocument');
+      document.body.classList.remove('monitorHodDocument');
+    };
+  }, []);
 
   useEffect(() => {
     async function loadProfiles() {
@@ -106,24 +68,74 @@ export default function MonitorHodPage({ hodList = [] }) {
   }, [hodList]);
 
   useEffect(() => {
-    if (selectedEmpCode && viewMode === 'attendance') {
-      loadAttendance(selectedEmpCode);
+    if (!selectedEmpCode || viewMode !== 'attendance') return undefined;
+
+    let active = true;
+    async function fetchAttendance() {
+      try {
+        const res = await fetch(`/api/employee?empcode=${selectedEmpCode}&month=${month}&year=${year}&monitor=true`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load attendance.');
+        if (active && data.attendance) {
+          setAttendance(sortAttendanceAsc(data.attendance));
+          setSelectedEmployee(data.employee || null);
+        }
+      } catch (err) {
+        console.error('Failed to load attendance:', err);
+        if (active) {
+          setAttendance([]);
+          setSelectedEmployee(null);
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
     }
+
+    fetchAttendance();
+    return () => {
+      active = false;
+    };
   }, [selectedEmpCode, viewMode, month, year]);
 
   useEffect(() => {
-    if (selectedEmpCode && viewMode === 'leave') {
-      loadLeave(selectedEmpCode);
+    if (!selectedEmpCode || viewMode !== 'leave') return undefined;
+
+    let active = true;
+    async function fetchLeave() {
+      try {
+        const res = await fetch(`/api/leave-history?empcode=${encodeURIComponent(selectedEmpCode)}&year=${year}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load leave records.');
+        if (active) {
+          setLeaveRecords(sortLeaveDesc(data.leave || []));
+          setLeaveEmployee(data.employee || null);
+        }
+      } catch (err) {
+        console.error('Failed to load leave records:', err);
+        if (active) {
+          setLeaveRecords([]);
+          setLeaveEmployee(null);
+        }
+      } finally {
+        if (active) setLeaveLoading(false);
+      }
     }
+
+    fetchLeave();
+    return () => {
+      active = false;
+    };
   }, [selectedEmpCode, viewMode, year]);
 
   function handleViewAttendance(empcode) {
     setSelectedEmpCode(empcode);
+    setLoading(true);
     setViewMode('attendance');
   }
 
   function handleViewLeave(empcode) {
     setSelectedEmpCode(empcode);
+    setLeaveLoading(true);
     setViewMode('leave');
   }
 
@@ -218,7 +230,7 @@ export default function MonitorHodPage({ hodList = [] }) {
   }
 
   return (
-    <div className="dashboardPage">
+    <div className="dashboardPage monitorHodPage">
       <div className="dashboardBlob dashboardBlobOne" />
       <div className="dashboardBlob dashboardBlobTwo" />
 
@@ -287,43 +299,49 @@ export default function MonitorHodPage({ hodList = [] }) {
                 ← Back to List
               </button>
 
-              <div className="hodFilterField">
-                <label>Month:</label>
-                <select
-                  value={month}
-                  onChange={(e) => setMonth(parseInt(e.target.value))}
+              <div className="hodDetailFilterControls">
+                <div className="hodFilterField">
+                  <label>Month:</label>
+                  <select
+                    value={month}
+                    onChange={(e) => {
+                      setLoading(true);
+                      setMonth(parseInt(e.target.value));
+                    }}
+                  >
+                    {monthNames.map((m, i) => (
+                      <option key={i} value={i + 1}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="hodFilterField">
+                  <label>Year:</label>
+                  <input
+                    type="number"
+                    className="yearInput"
+                    value={year}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      setLoading(true);
+                      setYear(Number.isNaN(val) ? new Date().getFullYear() : val);
+                    }}
+                    min="2000"
+                    max="2100"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  className="downloadExcelButton"
+                  onClick={handleDownloadExcel}
+                  disabled={exporting || loading || attendance.length === 0}
                 >
-                  {monthNames.map((m, i) => (
-                    <option key={i} value={i + 1}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
+                  {exporting ? 'Exporting…' : '⬇️ Download Excel'}
+                </button>
               </div>
-
-              <div className="hodFilterField">
-                <label>Year:</label>
-                <input
-                  type="number"
-                  className="yearInput"
-                  value={year}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value, 10);
-                    setYear(Number.isNaN(val) ? new Date().getFullYear() : val);
-                  }}
-                  min="2000"
-                  max="2100"
-                />
-              </div>
-
-              <button
-                type="button"
-                className="downloadExcelButton"
-                onClick={handleDownloadExcel}
-                disabled={exporting || loading || attendance.length === 0}
-              >
-                {exporting ? 'Exporting…' : '⬇️ Download Excel'}
-              </button>
             </div>
 
             <div className="hodSelectedInfo">
@@ -386,54 +404,57 @@ export default function MonitorHodPage({ hodList = [] }) {
                 ← Back to List
               </button>
 
-              <div className="hodFilterField">
-                <label>Year:</label>
-                <input
-                  type="number"
-                  className="yearInput"
-                  value={year}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value, 10);
-                    setYear(Number.isNaN(val) ? new Date().getFullYear() : val);
-                  }}
-                  min="2000"
-                  max="2100"
-                />
-              </div>
+              <div className="hodDetailFilterControls">
+                <div className="hodFilterField">
+                  <label>Year:</label>
+                  <input
+                    type="number"
+                    className="yearInput"
+                    value={year}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      setLeaveLoading(true);
+                      setYear(Number.isNaN(val) ? new Date().getFullYear() : val);
+                    }}
+                    min="2000"
+                    max="2100"
+                  />
+                </div>
 
-              <button
-                type="button"
-                className="downloadExcelButton"
-                onClick={handleDownloadLeaveExcel}
-                disabled={exportingLeave || leaveLoading || leaveRecords.length === 0}
-              >
-                {exportingLeave ? 'Exporting…' : '⬇️ Download Excel'}
-              </button>
+                <button
+                  type="button"
+                  className="downloadExcelButton"
+                  onClick={handleDownloadLeaveExcel}
+                  disabled={exportingLeave || leaveLoading || leaveRecords.length === 0}
+                >
+                  {exportingLeave ? 'Exporting…' : '⬇️ Download Excel'}
+                </button>
+              </div>
             </div>
 
             <div className="leaveInfoGrid">
               <div>
                 <strong>Empcode:</strong>
                 <span className="hodHighlightValue">
-                  {leaveEmployee?.Empcode || selectedEmpCode}
+                  {leaveHeaderEmployee?.EmpCode || selectedEmpCode}
                 </span>
               </div>
               <div>
                 <strong>Empname:</strong>
                 <span className="hodHighlightValue">
-                  {leaveEmployee?.EmpName || '-'}
+                  {leaveHeaderEmployee?.EmpName || '-'}
                 </span>
               </div>
               <div>
                 <strong>Department:</strong>
                 <span className="hodHighlightValue">
-                  {leaveEmployee?.DeptCode || '-'}
+                  {leaveHeaderEmployee?.DeptCode || '-'}
                 </span>
               </div>
               <div>
                 <strong>Section:</strong>
                 <span className="hodHighlightValue">
-                  {leaveEmployee?.Section || '-'}
+                  {leaveHeaderEmployee?.Section || '-'}
                 </span>
               </div>
             </div>
@@ -443,7 +464,7 @@ export default function MonitorHodPage({ hodList = [] }) {
             ) : leaveRecords.length === 0 ? (
               <p>No leave records found for the selected employee.</p>
             ) : (
-              <div className="hodTableWrapper">
+              <div className="hodTableWrapper leaveRecordsTableWrapper">
                 <div className="scrollableTableWrapper leaveDetailWrapper">
                   <table className="attendanceTable leaveDetailTable">
                     <thead>

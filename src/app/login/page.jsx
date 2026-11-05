@@ -9,6 +9,7 @@ export default function Login() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loginSucceeded, setLoginSucceeded] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -20,6 +21,7 @@ export default function Login() {
     e.preventDefault();
     setError('');
     setSuccess('');
+    setLoginSucceeded(false);
 
     const { username, password } = formData;
 
@@ -46,6 +48,7 @@ export default function Login() {
         return;
       }
 
+      setLoginSucceeded(true);
       setSuccess('Logged in successfully! Redirecting...');
       setFormData({ username: '', password: '' });
 
@@ -116,8 +119,13 @@ export default function Login() {
                   />
                 </div>
 
-                <button type="submit" disabled={loading} className="loginButton">
-                  {loading ? 'Logging in...' : 'Sign in'}
+                <button
+                  type="submit"
+                  disabled={loading || loginSucceeded}
+                  className={`loginButton${loginSucceeded ? ' loginButtonSuccess' : ''}`}
+                  aria-label={loginSucceeded ? 'Signed in successfully' : undefined}
+                >
+                  {loginSucceeded ? <span aria-hidden="true">✓</span> : loading ? 'Logging in...' : 'Login'}
                 </button>
               </form>
             </div>

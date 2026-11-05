@@ -2,10 +2,19 @@
   padding: 24px;
 }
 
+.pendingLeavesHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 16px;
+}
+
 .pendingLeavesTitle {
   font-size: 1.5rem;
   font-weight: 600;
-  margin-bottom: 16px;
+  margin: 0;
+  white-space: nowrap;
 }
 
 .pendingLeavesEmpty {
@@ -15,32 +24,45 @@
 .pendingLeavesFilterBar {
   display: flex;
   align-items: flex-end;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 16px;
+  gap: 10px;
+  flex-wrap: nowrap;
+  margin: 0 0 0 auto;
 }
 
 .pendingLeavesFilterField {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .pendingLeavesFilterField label {
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   font-weight: 600;
   color: #333;
 }
 
 .pendingLeavesFilterField input,
 .pendingLeavesFilterField select {
-  padding: 8px 10px;
+  padding: 6px 8px;
   border: 1px solid #e0e0e0;
   border-radius: 6px;
-  font-size: 0.9rem;
-  min-width: 140px;
+  font-size: 0.82rem;
+  min-width: 105px;
   background: #fff;
   outline: none;
+}
+
+.pendingLeavesFilterField input {
+  width: 90px;
+  min-width: 90px;
+}
+
+.pendingLeavesFilterField #month {
+  min-width: 115px;
+}
+
+.pendingLeavesFilterField #status {
+  min-width: 175px;
 }
 
 .pendingLeavesFilterField input:focus,
@@ -59,12 +81,12 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
+  padding: 7px 12px;
   border: none;
   border-radius: 6px;
   background-color: #10b981;
   color: #fff;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -98,24 +120,20 @@
 }
 
 .pendingLeavesTable th {
-  background-color: #f5f5f5;
+  background-color: #073b69;
+  color: #ffffff;
+  border-color: #15598b;
   font-weight: 600;
 }
-.pendingLeavesClearButton {
-  display: inline-flex;
-  align-items: center;
-  padding: 8px 16px;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  background-color: #fff;
-  color: #333;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background-color 0.15s ease;
-}
+@media (max-width: 1100px) {
+  .pendingLeavesHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 
-.pendingLeavesClearButton:hover {
-  background-color: #f5f5f5;
+  .pendingLeavesFilterBar {
+    width: 100%;
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
 }

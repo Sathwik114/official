@@ -1,16 +1,14 @@
-html, body {
-  overflow: hidden;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-}
-
 .dashboardPage {
   height: 100vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   width: 100%;
+  background: #f1f5f9;
+}
+
+.dashboardPage.myLeavesPage {
+  padding-top: 0.5rem;
 }
 
 .dashboardBlob {
@@ -37,15 +35,26 @@ html, body {
   background: rgba(196, 181, 253, 0.25);
 }
 
-.dashboardHeader {
-  padding: 0.75rem 5px 0.25rem;
+.dashboardHeaderTitle {
+  margin: 0;
+  margin-right: auto;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #0f172a;
+  white-space: nowrap;
   flex-shrink: 0;
 }
 
-.dashboardHeaderTitle {
-  margin: 0;
-  font-size: 1.4rem;
-  font-weight: 800;
+.myLeavesEmployeeDetails {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.25rem;
+  margin-top: 0.35rem;
+  color: #334155;
+  font-size: 0.85rem;
+}
+
+.myLeavesEmployeeDetails strong {
   color: #0f172a;
 }
 
@@ -68,12 +77,13 @@ html, body {
 .tableFilterBar {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  padding: 0.75rem 0;
-  font-size: 13.5px;
+  gap: 0.5rem;
+  padding: 0.25rem 5px 0.5rem;
+  font-size: 12.5px;
   font-weight: 600;
   color: #334155;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .tableFilterBar input[type="date"] {
@@ -105,8 +115,8 @@ html, body {
   box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.25);
 }
 
-.yearFilterInput {
-  width: 5.5rem;
+.tableFilterBar .yearFilterInput {
+  width: 4.5rem;
   padding: 0.4rem 0.6rem;
   border-radius: 0.5rem;
   border: 1.5px solid #cbd5e1;
@@ -116,13 +126,13 @@ html, body {
   background: #fff;
 }
 
-.yearFilterInput:focus {
+.tableFilterBar .yearFilterInput:focus {
   border-color: #7dd3fc;
   box-shadow: 0 0 0 3px rgba(125, 211, 252, 0.25);
 }
 
 .exportExcelBtn {
-  margin-left: auto;
+  margin-left: 0;
   padding: 0.45rem 0.9rem;
   border-radius: 0.5rem;
   border: none;
@@ -157,92 +167,150 @@ html, body {
   background: #e2e8f0;
 }
 
-/* Only the rows scroll (vertically). The table itself always fits the
-   container width (screen width - 5px) — no horizontal scrollbar. */
 .tableScrollWrapper {
   width: 100%;
   flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  max-height: calc(15 * 44px + 44px); /* header row + 15 data rows */
-  background: transparent;   /* no white container box */
-  border: none;               /* no boxed border around the table */
+  overflow-y: scroll;
+  overflow-x: scroll;
+  max-height: calc(15 * 36px + 36px); /* header row + 15 data rows */
+  background: #fff;
+  border: 1px solid #94a3b8;
+  border-radius: 8px;
   min-height: 0;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #e2e8f0;
 }
 
 .tableScrollWrapper::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  display: block;
+  width: 6px;
+  height: 6px;
 }
 .tableScrollWrapper::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
+  background: #94a3b8;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
 }
 .tableScrollWrapper::-webkit-scrollbar-track {
-  background: transparent;
+  background: #e2e8f0;
 }
 
 .attendanceTable {
-  width: 100%;                   /* always fits the container (screen width - 5px) */
-  table-layout: fixed;
+  width: max-content;
+  min-width: max(100%, 1700px);
+  table-layout: auto;
   border-collapse: collapse;
   font-size: 13px;
-  background: transparent;       /* table itself has no solid background */
+  background: #fff;
 }
 
 .attendanceTable th,
 .attendanceTable td {
-  padding: 0.55rem 0.4rem;
+  height: 36px;
+  padding: 0.3rem 0.4rem;
   text-align: left;
-  border: 1px solid #d9dee5;     /* cell borders kept for readability, remove if not wanted */
+  border: 1px solid #94a3b8;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: #111827;
+  vertical-align: middle;
 }
 
-.attendanceTable thead th {
+.attendanceTable td.leaveApprovalStatusWaiting,
+.attendanceTable td.leaveApprovalStatusRejected {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.attendanceTable td.leaveApprovalStatusAccepted {
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.dashboardPage .attendanceTable thead th {
   position: sticky;
   top: 0;
-  background: #e0f2fe;
-  color: #0f172a;
+  background: #073b69;
+  color: #ffffff;
   font-weight: 700;
   font-size: 11.5px;
-  z-index: 1;
+  text-align: center;
+  text-transform: none;
+  border: 1px solid #15598b;
+  border-bottom-width: 2px;
+  box-shadow: inset 0 -2px #15598b;
+  z-index: 2;
 }
 
-.attendanceTable tbody tr {
-  background: transparent;
+.dashboardPage .attendanceTable tbody tr:last-child td {
+  border-bottom: 1px solid #94a3b8;
 }
 
-.attendanceTable tbody tr:nth-child(even) {
-  background: rgba(148, 163, 184, 0.08);
+.dashboardPage .attendanceTable tbody tr:not(.selectedLeaveRow),
+.dashboardPage .attendanceTable tbody tr:not(.selectedLeaveRow) td {
+  background: #fff;
 }
 
-/* 13 columns — widths sum to 100% so the table fills wide screens
-   and shrinks proportionally (with horizontal scroll) on narrow ones */
+.dashboardPage .attendanceTable tbody tr {
+  cursor: pointer;
+}
+
+.dashboardPage .attendanceTable tbody tr.selectedLeaveRow,
+.dashboardPage .attendanceTable tbody tr.selectedLeaveRow td {
+  background: #dbeafe;
+}
+
+.attendanceTable td.leaveReasonCell {
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.attendanceTable tbody td:nth-child(7),
+.attendanceTable tbody td:nth-child(8),
+.attendanceTable tbody td:nth-child(9),
+.attendanceTable tbody td:nth-child(10) {
+  text-align: right;
+}
+
+.attendanceTable tbody td:nth-child(11),
+.attendanceTable tbody td:nth-child(12),
+.attendanceTable tbody td:nth-child(13) {
+  text-align: center;
+}
+
+.leaveReasonText {
+  display: inline-block;
+  width: max-content;
+}
+
 .attendanceTable th:nth-child(1),
-.attendanceTable td:nth-child(1) { width: 4%; }   /* S.No */
+.attendanceTable td:nth-child(1) { width: 60px; }   /* S.No */
 .attendanceTable th:nth-child(2),
-.attendanceTable td:nth-child(2) { width: 8%; }   /* Date Applied */
+.attendanceTable td:nth-child(2) { width: 110px; }  /* Employee id */
 .attendanceTable th:nth-child(3),
-.attendanceTable td:nth-child(3) { width: 7%; }   /* Applicant ID */
+.attendanceTable td:nth-child(3) { min-width: 180px; } /* Employee name */
 .attendanceTable th:nth-child(4),
-.attendanceTable td:nth-child(4) { width: 11%; }  /* Applicant Name */
+.attendanceTable td:nth-child(4) { width: 110px; }  /* Department */
 .attendanceTable th:nth-child(5),
-.attendanceTable td:nth-child(5) { width: 8%; }   /* Department */
+.attendanceTable td:nth-child(5) { width: 120px; }  /* Section */
 .attendanceTable th:nth-child(6),
-.attendanceTable td:nth-child(6) { width: 8%; }   /* Section */
+.attendanceTable td:nth-child(6) { width: 100px; }  /* Leave type */
 .attendanceTable th:nth-child(7),
-.attendanceTable td:nth-child(7) { width: 7%; }   /* Leave Type */
+.attendanceTable td:nth-child(7) { width: 110px; }  /* Start date */
 .attendanceTable th:nth-child(8),
-.attendanceTable td:nth-child(8) { width: 6%; }   /* From Time */
+.attendanceTable td:nth-child(8) { width: 110px; }  /* End date */
 .attendanceTable th:nth-child(9),
-.attendanceTable td:nth-child(9) { width: 6%; }   /* To Time */
+.attendanceTable td:nth-child(9) { width: 100px; } /* From time */
 .attendanceTable th:nth-child(10),
-.attendanceTable td:nth-child(10) { width: 8%; cursor: help; } /* Reason */
+.attendanceTable td:nth-child(10) { width: 100px; } /* To time */
 .attendanceTable th:nth-child(11),
-.attendanceTable td:nth-child(11) { width: 6%; }  /* Status */
+.attendanceTable td:nth-child(11) { width: 100px; } /* Total days */
 .attendanceTable th:nth-child(12),
-.attendanceTable td:nth-child(12) { width: 11%; } /* Attachment */
+.attendanceTable td:nth-child(12) { width: 120px; } /* Vpre aprvl */
 .attendanceTable th:nth-child(13),
-.attendanceTable td:nth-child(13) { width: 10%; } /* Current Approver */
+.attendanceTable td:nth-child(13) { width: 120px; } /* Pre aprvl */
+.attendanceTable th:nth-child(14),
+.attendanceTable td:nth-child(14) { width: 180px; } /* Attachment */

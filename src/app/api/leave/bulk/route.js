@@ -1,43 +1,68 @@
 import { NextResponse } from 'next/server';
 import { getLeaveRequestById, addLeaveApproval, updateLeaveRequestStatus, updateLeaveRequestRejection } from '@/lib/leaveDb';
 import { getEmployeeDetails } from '@/lib/payrollDb';
-import { getUserEmail, sendMail, buildLeaveRequestEmailContent, getApprovalStatusesForEmail, getApprovalLink, getDirectApproveLink, getDirectRejectLink } from '@/lib/mail';
+import { getUserEmail, sendMail, buildLeaveRequestEmailContent, buildLeaveApprovalNotificationEmailContent, getApprovalStatusesForEmail, getDirectApprovalsLink } from '@/lib/mail';
+import { getAuthenticatedUserId } from '@/lib/auth';
 
 export async function POST(request) {
   try {
-    const body = await request.json();
-    const { ids, approverId, decision, remarks } = body;
+    const currentUserId = await getAuthenticatedUserId();
+    if (!currentUserId) {
+      return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
+    }
 
-    if (!Array.isArray(ids) || ids.length === 0) {
-      return NextResponse.json({ error: 'ids array is required' }, { status: 400 });
+    const body = await request.json();
+    const { ids, approverId, decision, remarks } = body || {};
+
+    if (!Array.isArray(ids) || ids.length === 0 || ids.length > 500) {
+      return NextResponse.json({ error: 'Select between 1 and 500 leave requests.' }, { status: 400 });
+    }
+    const leaveRequestIds = ids.map(Number);
+    if (leaveRequestIds.some((id) => !Number.isSafeInteger(id) || id <= 0)
+      || new Set(leaveRequestIds).size !== leaveRequestIds.length) {
+      return NextResponse.json({ error: 'Leave request IDs must be unique positive integers.' }, { status: 400 });
+    }
+    if (String(approverId || '').trim() !== currentUserId) {
+      return NextResponse.json({ error: 'Approver does not match the signed-in user.' }, { status: 403 });
+    }
+    const decisionValue = String(decision || 'APPROVED').toUpperCase();
+    if (!['APPROVED', 'REJECTED'].includes(decisionValue)) {
+      return NextResponse.json({ error: 'Decision must be APPROVED or REJECTED.' }, { status: 400 });
+    }
+    if (decisionValue === 'REJECTED' && !String(remarks || '').trim()) {
+      return NextResponse.json({ error: 'A rejection reason is required.' }, { status: 400 });
     }
 
     const results = [];
 
-    for (const id of ids) {
+    for (const id of leaveRequestIds) {
       const leaveRequest = await getLeaveRequestById(Number(id));
       if (!leaveRequest) {
         results.push({ id, success: false, error: 'not found' });
         continue;
       }
 
-      const flow = String(leaveRequest.ApprovalFlow || '').split(',').filter(Boolean);
       const requestCurrentApproverId = String(leaveRequest.CurrentApproverId || '').trim();
-      const currentStep = flow.indexOf(requestCurrentApproverId);
+      if (String(leaveRequest.Status || '').toUpperCase() !== 'PENDING' || requestCurrentApproverId !== currentUserId) {
+        results.push({ id, success: false, error: 'This request is not pending with the signed-in user.' });
+        continue;
+      }
+
+      const flow = String(leaveRequest.ApprovalFlow || '').split(',').map((approver) => approver.trim()).filter(Boolean);
+      const currentStep = flow.indexOf(currentUserId);
+      if (currentStep === -1) {
+        results.push({ id, success: false, error: 'Signed-in user is not configured in the approval flow.' });
+        continue;
+      }
       const nextApprover = flow[currentStep + 1] || null;
 
-      const decisionValue = String(decision || 'APPROVED').toUpperCase();
-
-      await addLeaveApproval(Number(id), approverId, decisionValue, remarks || '', currentStep + 1);
+      await addLeaveApproval(Number(id), currentUserId, decisionValue, remarks || '', currentStep + 1);
 
       if (decisionValue === 'APPROVED') {
-        await updateLeaveRequestStatus(Number(id), nextApprover || '', nextApprover ? 'PENDING' : 'APPROVED', approverId, currentStep + 1);
+        await updateLeaveRequestStatus(Number(id), nextApprover || '', nextApprover ? 'PENDING' : 'APPROVED', currentUserId, currentStep + 1);
         results.push({ id, success: true, nextApprover });
 
-        const approverName = (await getEmployeeDetails(approverId).catch(() => null))?.EmpName || approverId;
-        const nextApproverName = nextApprover
-          ? (await getEmployeeDetails(nextApprover).catch(() => null))?.EmpName || nextApprover
-          : '';
+        const approverName = (await getEmployeeDetails(currentUserId).catch(() => null))?.EmpName || currentUserId;
         const applicantEmployee = await getEmployeeDetails(leaveRequest.ApplicantId);
 
         const emailRequest = {
@@ -77,15 +102,23 @@ export async function POST(request) {
         if (nextApprover) {
           recipientEmail = getUserEmail(nextApprover);
           emailSubject = `Leave Request Approved by ${approverName} - Next Approval Required`;
-          emailContent = buildLeaveRequestEmailContent(emailRequest, {
-            action: 'Approved',
-            currentApproverName: approverName,
-            nextApproverName,
-            status: 'PENDING',
-            senderName: approverName,
-            approvalLink: getApprovalLink(id, nextApprover),
-            directApproveLink: getDirectApproveLink(id, nextApprover),
-            directRejectLink: getDirectRejectLink(id, nextApprover),
+          emailContent = buildLeaveApprovalNotificationEmailContent({
+            applicantId: emailRequest.applicantId,
+            applicantName: emailRequest.applicantName,
+            department: emailRequest.department,
+            startDate: emailRequest.startDate,
+            endDate: emailRequest.endDate,
+            leaveType: emailRequest.leaveType,
+            totalDays: emailRequest.totalDays,
+            reason: emailRequest.reason,
+            approvalLink: await getDirectApprovalsLink(nextApprover, {
+              TranId: emailRequest.TranId,
+              EmpCode: emailRequest.applicantId,
+              EmpName: emailRequest.applicantName,
+              StartDate: emailRequest.startDate,
+              EndDate: emailRequest.endDate,
+              LeaveType: emailRequest.leaveType,
+            }),
           });
         }
 
@@ -102,10 +135,10 @@ export async function POST(request) {
           }
         }
       } else {
-        await updateLeaveRequestRejection(Number(id), approverId, remarks || '', currentStep + 1);
+        await updateLeaveRequestRejection(Number(id), currentUserId, remarks || '', currentStep + 1);
         results.push({ id, success: true, rejected: true });
 
-        const approverName = (await getEmployeeDetails(approverId).catch(() => null))?.EmpName || approverId;
+        const approverName = (await getEmployeeDetails(currentUserId).catch(() => null))?.EmpName || currentUserId;
         const applicantEmployee = await getEmployeeDetails(leaveRequest.ApplicantId);
 
         const emailRequest = {

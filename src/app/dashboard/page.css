@@ -22,7 +22,7 @@ body::-webkit-scrollbar {
   flex: 1;              /* was: height: 100vh — now fills whatever height dashboardShell has left after the navbar */
   min-height: 0;         /* add this — lets it shrink so overflow:hidden + the table's internal scroll behave correctly */
   padding: 2rem 1.25rem 5px 1.25rem;
-  background: linear-gradient(160deg, #fdf2f8 0%, #fce7f3 50%, #fbcfe8 100%);
+  background: #f1f5f9;
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -57,38 +57,7 @@ body::-webkit-scrollbar {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: linear-gradient(160deg, #fdf2f8 0%, #fce7f3 50%, #fbcfe8 100%);
-}
-
-.dashboardNavbar {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 1rem 1.25rem;
-  margin-bottom: 1rem;
-  background: rgba(255,255,255,0.9);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid #fbcfe8;
-}
-
-.dashboardNavLinks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.dashboardNavLink {
-  text-decoration: none;
-  padding: 0.55rem 0.9rem;
-  border-radius: 999px;
-  background: #fff;
-  color: #be185d;
-  font-weight: 700;
-  border: 1px solid #fbcfe8;
+  background: #f1f5f9;
 }
 
 .dashboardTopBar {
@@ -223,8 +192,8 @@ body::-webkit-scrollbar {
 }
 
 .dashboardAttendanceTableWrap::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 .dashboardAttendanceTableWrap::-webkit-scrollbar-track {
@@ -255,7 +224,7 @@ body::-webkit-scrollbar {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: #ffffff;
-  background: #9d174d;
+  background: #073b69;
   white-space: nowrap;
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.05);
 }

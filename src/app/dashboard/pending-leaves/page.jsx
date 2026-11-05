@@ -95,11 +95,10 @@ export default async function PendingLeavesPage({ searchParams }) {
 
   return (
     <div className="pendingLeavesContainer">
-      <h1 className="pendingLeavesTitle">
-        Pending Leaves
-      </h1> 
-
-      <PendingLeavesControls leaves={pendingLeaves} />
+      <div className="pendingLeavesHeader">
+        <h1 className="pendingLeavesTitle">Pending Leaves</h1>
+        <PendingLeavesControls leaves={pendingLeaves} />
+      </div>
 
       {pendingLeaves.length === 0 ? (
         <p className="pendingLeavesEmpty">

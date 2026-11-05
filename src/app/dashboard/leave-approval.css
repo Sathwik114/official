@@ -19,21 +19,154 @@
   font-size: 0.9rem;
 }
 
+.leaveActionPopupOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.leaveActionPopup {
+  width: min(100%, 28rem);
+  padding: 1.5rem;
+  border: 1px solid #86efac;
+  border-radius: 0.85rem;
+  background: #ffffff;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+}
+
+.leaveActionPopup h2 {
+  margin: 0 0 0.65rem;
+  color: #166534;
+  font-size: 1.15rem;
+}
+
+.leaveActionPopup p {
+  margin: 0 0 1.1rem;
+  color: #334155;
+  line-height: 1.5;
+}
+
+.leaveActionPopupError {
+  border-color: #fca5a5;
+}
+
+.leaveActionPopupError h2 {
+  color: #b91c1c;
+}
+
 .leaveLoadingText {
   color: #9d174d;
   font-weight: 600;
   flex-shrink: 0;
 }
 
-/* NEW: root page container fills the viewport exactly and never
-   scrolls itself — all scrolling happens inside .leaveTableScrollWrapper. */
+/* Use the space below the dashboard navbar; table wrappers handle scrolling. */
 .leaveFitScreenRoot {
-  height: 100dvh;
-  max-height: 100dvh;
+  height: auto;
+  max-height: none;
+  min-height: 0;
+  flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   box-sizing: border-box;
+  padding-top: 0.65rem;
+}
+
+.directApprovalPage {
+  align-items: stretch;
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 100vh;
+  height: auto;
+  padding-bottom: 56px;
+  overflow: visible;
+}
+
+html.directApprovalDocument,
+body.directApprovalDocument {
+  height: auto;
+  min-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #64748b #e2e8f0;
+  -ms-overflow-style: auto;
+}
+
+html.directApprovalDocument::-webkit-scrollbar,
+body.directApprovalDocument::-webkit-scrollbar {
+  display: block;
+  width: 6px;
+}
+
+html.directApprovalDocument::-webkit-scrollbar-thumb,
+body.directApprovalDocument::-webkit-scrollbar-thumb {
+  background: #64748b;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+html.directApprovalDocument::-webkit-scrollbar-track,
+body.directApprovalDocument::-webkit-scrollbar-track {
+  background: #e2e8f0;
+}
+
+@media (max-width: 900px), (max-height: 700px) {
+  .directApprovalPage {
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 100vh;
+  }
+
+  .directApprovalPage .leaveTableCard {
+    flex: 0 0 auto;
+    min-height: auto;
+  }
+
+  .directApprovalPage .leaveTableScrollWrapper {
+    flex: 0 0 min(440px, 55vh);
+    height: min(440px, 55vh);
+    min-height: 9rem;
+  }
+}
+
+.directApprovalPage .leaveTableCard {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.directApprovalPage .leaveTableScrollWrapper {
+  flex: 1 1 0;
+  height: auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #64748b #e2e8f0;
+  -ms-overflow-style: auto;
+}
+
+.directApprovalPage .leaveTableScrollWrapper::-webkit-scrollbar {
+  display: block;
+  width: 6px;
+  height: 6px;
+}
+
+.directApprovalPage .leaveTableScrollWrapper::-webkit-scrollbar-thumb {
+  background: #64748b;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.directApprovalPage .leaveTableScrollWrapper::-webkit-scrollbar-track {
+  background: #e2e8f0;
 }
 
 /* Card now grows to fill whatever vertical space is left in the
@@ -44,8 +177,8 @@
   z-index: 1;
   width: 100%;
   max-width: 100%;
-  margin: 1.25rem 0 0;
-  padding: 1rem 5px 1.5rem;
+  margin: 0.65rem 0 0;
+  padding: 0.75rem 5px 1rem;
   box-sizing: border-box;
   background: #ffffff;
   border-radius: 1rem;
@@ -58,12 +191,18 @@
   min-height: 0;
 }
 
+.leavePendingCard {
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
 .leaveTableCard h2 {
-  margin: 0 0 1rem 0;
+  margin: 0 0 0.65rem 0;
   font-size: 1.15rem;
   font-weight: 800;
   color: #075985;
   flex-shrink: 0;
+  text-transform: none;
 }
 
 .leaveTableCard p {
@@ -73,12 +212,41 @@
 }
 
 .leaveApprovedCard {
+  flex: 0 0 auto;
   background: #fdf7fb;
   border-color: #f5c2dd;
 }
 
+.leaveApprovedCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.65rem;
+}
+
+.leaveApprovedCardHeader h2 {
+  margin: 0;
+}
+
+.leaveApprovedTableScrollWrapper {
+  flex: 0 0 560px;
+  height: 560px;
+  min-height: 0;
+}
+
+.leaveApprovedCard .leaveNoScrollTable tbody tr {
+  height: 30px;
+}
+
+.leaveApprovedCard .leaveNoScrollTable tbody td {
+  height: 30px;
+  padding: 2px 0.55rem;
+  box-sizing: border-box;
+}
+
 .leaveBulkActionsRow {
-  margin-top: 0.85rem;
+  margin-top: 0.55rem;
   display: flex;
   gap: 0.6rem;
   flex-shrink: 0;
@@ -93,85 +261,227 @@
   min-height: 0;
   width: 100%;
   overflow-x: auto;
-  overflow-y: auto;
+  overflow-y: scroll;
   margin-bottom: 5px;
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: #9ca3af #f1f1f1;
+  -ms-overflow-style: auto;
+}
+
+.leavePendingTableScrollWrapper {
+  flex: 0 0 440px;
+  height: 440px;
+  min-height: 0;
 }
 
 .leaveTableScrollWrapper::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  display: block;
+  width: 6px;
+  height: 6px;
 }
 .leaveTableScrollWrapper::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #9ca3af;
+  border: 1px solid #f1f1f1;
   border-radius: 4px;
 }
 .leaveTableScrollWrapper::-webkit-scrollbar-track {
-  background: transparent;
+  background: #f1f1f1;
 }
 
 .leaveNoScrollTable {
-  width: 100%;
-  min-width: 54rem;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
   font-size: 0.85rem;
 }
 
 .leaveNoScrollTable thead th {
   text-align: left;
-  padding: 0.65rem 0.7rem;
+  padding: 0.45rem 0.55rem;
   font-size: 0.73rem;
   font-weight: 700;
-  text-transform: uppercase;
+  text-transform: none;
   letter-spacing: 0.03em;
-  color: #be185d;
-  border-bottom: 2px solid #fbcfe8;
+  color: #ffffff;
+  border: 1px solid #15598b;
   white-space: nowrap;
   position: sticky;
   top: 0;
-  background: #ffffff;
+  background: #073b69;
   z-index: 1;
 }
 
+.leaveFitScreenRoot .leaveNoScrollTable thead th {
+  background-color: #073b69;
+}
+
+.leavePendingCard .leaveNoScrollTable thead th {
+  border-bottom: 2px solid #5b86aa;
+}
+
 .leaveNoScrollTable tbody td {
-  padding: 0.6rem 0.7rem;
+  height: 32px;
+  padding: 0.25rem 0.55rem;
+  line-height: 20px;
   color: #374151;
-  border-bottom: 1px solid #fce7f3;
+  border: 1px solid #d1d5db;
   white-space: nowrap;
 }
 
-/* Column order (current): 1 checkbox, 2 Date Applied, 3 Applicant ID,
-   4 Applicant Name, 5 Department, 6 Section, 7 Leave Type, 8 From Time,
-   9 To Time, 10 Days, 11 Reason, 12 Attachment, 13 Current Approver,
-   14 Status, 15 Action.
-   Applicant Name (4) gets the min-width that was mistakenly on col 2;
-   Reason (11) gets the wrap-friendly min-width that was mistakenly on col 5 —
-   that mistargeting is what was causing the huge Section/Leave Type gap. */
-.leaveNoScrollTable td:nth-child(4),
-.leaveNoScrollTable th:nth-child(4) {
-  min-width: 10rem;
+.leaveNoScrollTable tbody td.leaveApprovalStatusPending {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.leaveNoScrollTable tbody td.leaveApprovalStatusAccepted {
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.leaveNoScrollTable tbody td.leaveApprovalStatusRejected {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.leavePendingCard .leaveNoScrollTable tbody tr {
+  height: 30px;
+}
+
+.leavePendingCard .leaveNoScrollTable tbody td {
+  height: 30px;
+  padding: 2px 0.55rem;
+  box-sizing: border-box;
+}
+
+.leavePendingCard .leaveNoScrollTable tbody tr > td {
+  border-bottom: 1px solid #9ca3af;
+}
+
+.leavePendingCard .leaveNoScrollTable th:nth-child(2),
+.leavePendingCard .leaveNoScrollTable td:nth-child(2),
+.leaveApprovedCard .leaveNoScrollTable th:nth-child(1),
+.leaveApprovedCard .leaveNoScrollTable td:nth-child(1) { width: 100px; }
+
+.leavePendingCard .leaveNoScrollTable th:nth-child(3),
+.leavePendingCard .leaveNoScrollTable td:nth-child(3),
+.leaveApprovedCard .leaveNoScrollTable th:nth-child(2),
+.leaveApprovedCard .leaveNoScrollTable td:nth-child(2) { width: 180px; }
+
+.leavePendingCard .leaveNoScrollTable th:nth-child(7),
+.leavePendingCard .leaveNoScrollTable td:nth-child(7),
+.leavePendingCard .leaveNoScrollTable th:nth-child(8),
+.leavePendingCard .leaveNoScrollTable td:nth-child(8),
+.leaveApprovedCard .leaveNoScrollTable th:nth-child(6),
+.leaveApprovedCard .leaveNoScrollTable td:nth-child(6),
+.leaveApprovedCard .leaveNoScrollTable th:nth-child(7),
+.leaveApprovedCard .leaveNoScrollTable td:nth-child(7) { width: 110px; }
+
+.leavePendingCard .leaveNoScrollTable th:nth-child(9),
+.leavePendingCard .leaveNoScrollTable td:nth-child(9),
+.leavePendingCard .leaveNoScrollTable th:nth-child(10),
+.leavePendingCard .leaveNoScrollTable td:nth-child(10),
+.leaveApprovedCard .leaveNoScrollTable th:nth-child(8),
+.leaveApprovedCard .leaveNoScrollTable td:nth-child(8),
+.leaveApprovedCard .leaveNoScrollTable th:nth-child(9),
+.leaveApprovedCard .leaveNoScrollTable td:nth-child(9) { width: 100px; }
+
+.leavePendingCard .leaveNoScrollTable th:nth-child(11),
+.leavePendingCard .leaveNoScrollTable td:nth-child(11),
+.leaveApprovedCard .leaveNoScrollTable th:nth-child(10),
+.leaveApprovedCard .leaveNoScrollTable td:nth-child(10) { width: 70px; }
+
+.leavePendingCard .leaveNoScrollTable th:nth-child(12),
+.leavePendingCard .leaveNoScrollTable td:nth-child(12),
+.leaveApprovedCard .leaveNoScrollTable th:nth-child(11),
+.leaveApprovedCard .leaveNoScrollTable td:nth-child(11) { width: 64px; }
+
+.leavePendingCard .leaveNoScrollTable th:nth-child(13),
+.leavePendingCard .leaveNoScrollTable td:nth-child(13),
+.leaveApprovedCard .leaveNoScrollTable th:nth-child(12),
+.leaveApprovedCard .leaveNoScrollTable td:nth-child(12) { width: 100px; }
+
+.leavePendingCard .leaveNoScrollTable th:nth-child(14),
+.leavePendingCard .leaveNoScrollTable td:nth-child(14),
+.leaveApprovedCard .leaveNoScrollTable th:nth-child(13),
+.leaveApprovedCard .leaveNoScrollTable td:nth-child(13) {
+  width: 150px;
+}
+
+.leavePendingCard .leaveNoScrollTable th:nth-child(15),
+.leavePendingCard .leaveNoScrollTable td:nth-child(15),
+.leaveApprovedCard .leaveNoScrollTable th:nth-child(14),
+.leaveApprovedCard .leaveNoScrollTable td:nth-child(14) {
+  width: 110px;
+}
+
+.leavePendingCard .leaveNoScrollTable th:nth-child(16),
+.leavePendingCard .leaveNoScrollTable td:nth-child(16),
+.leaveApprovedCard .leaveNoScrollTable th:nth-child(15),
+.leaveApprovedCard .leaveNoScrollTable td:nth-child(15) { width: 110px; }
+
+.leaveNoScrollTable td.leaveReasonCell {
+  overflow: visible;
+  text-overflow: clip;
   white-space: nowrap;
 }
 
-.leaveNoScrollTable td:nth-child(11),
-.leaveNoScrollTable th:nth-child(11) {
-  min-width: 14rem;
-  white-space: normal;
-  word-break: break-word;
+.leavePendingCard .leaveNoScrollTable th:nth-child(18),
+.leavePendingCard .leaveNoScrollTable td:nth-child(18),
+.leaveApprovedCard .leaveNoScrollTable th:nth-child(17),
+.leaveApprovedCard .leaveNoScrollTable td:nth-child(17) {
+  width: 180px;
 }
 
-.leaveNoScrollTable th:first-child,
-.leaveNoScrollTable td:first-child {
+.leavePendingCard .leaveNoScrollTable th:first-child,
+.leavePendingCard .leaveNoScrollTable td:first-child {
   width: 40px;
   text-align: center;
+}
+
+.leavePendingCard .leaveNoScrollTable th:nth-child(3),
+.leavePendingCard .leaveNoScrollTable td:nth-child(3),
+.leaveApprovedCard .leaveNoScrollTable th:nth-child(1),
+.leaveApprovedCard .leaveNoScrollTable td:nth-child(1) {
+  width: 72px;
+  min-width: 72px;
+}
+
+.leavePendingCard .leaveNoScrollTable th:nth-child(4),
+.leavePendingCard .leaveNoScrollTable td:nth-child(4),
+.leavePendingCard .leaveNoScrollTable th:nth-child(5),
+.leavePendingCard .leaveNoScrollTable td:nth-child(5),
+.leavePendingCard .leaveNoScrollTable th:nth-child(6),
+.leavePendingCard .leaveNoScrollTable td:nth-child(6),
+.leavePendingCard .leaveNoScrollTable th:nth-child(17),
+.leavePendingCard .leaveNoScrollTable td:nth-child(17),
+.leaveApprovedCard .leaveNoScrollTable th:nth-child(3),
+.leaveApprovedCard .leaveNoScrollTable td:nth-child(3),
+.leaveApprovedCard .leaveNoScrollTable th:nth-child(4),
+.leaveApprovedCard .leaveNoScrollTable td:nth-child(4),
+.leaveApprovedCard .leaveNoScrollTable th:nth-child(5),
+.leaveApprovedCard .leaveNoScrollTable td:nth-child(5) {
+  width: auto;
+  min-width: max-content;
+}
+
+.leaveApprovedCard .leaveNoScrollTable th:nth-child(16),
+.leaveApprovedCard .leaveNoScrollTable td:nth-child(16) {
+  width: auto;
+  min-width: max-content;
 }
 
 .leaveNoScrollTable tbody tr:hover {
   background: #fdf2f8;
 }
 
-.leaveNoScrollTable tbody tr:last-child td {
-  border-bottom: none;
+.leaveNoScrollTable tbody tr.leaveApprovalSelectedRow,
+.leaveNoScrollTable tbody tr.leaveApprovalSelectedRow:hover {
+  background: #dbeafe;
+}
+
+.leaveNoScrollTable tbody tr.leaveApprovalSelectedRow td {
+  background: #dbeafe;
 }
 
 .applyLeaveButton {
@@ -206,6 +516,34 @@
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
+  box-shadow: none;
+}
+
+.leaveBulkApproveButton {
+  border: 1px solid #073b69;
+  background: #16a34a;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.leaveBulkRejectButton {
+  border: 1px solid #b91c1c;
+  background: #dc2626;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.leaveBulkRejectButton:hover:not(:disabled) {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: #ffffff;
+  box-shadow: none;
+}
+
+.leaveBulkApproveButton:hover:not(:disabled) {
+  background: #15803d;
+  border-color: #15803d;
+  color: #ffffff;
   box-shadow: none;
 }
 
@@ -265,27 +603,29 @@
 .leaveDetailTable {
   display: flex;
   flex-direction: column;
+  border: 1px solid #cbd5e1;
 }
 
 .leaveDetailRow {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  border-bottom: 1px solid #e2e8f0;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr) minmax(0, 0.8fr) minmax(0, 1.2fr);
+  border-bottom: 1px solid #cbd5e1;
 }
 
 .leaveDetailRow:last-of-type {
-  border-bottom: none;
+  border-bottom: 1px solid #cbd5e1;
 }
 
 .leaveDetailRowHeader {
   background: #f8fafc;
+  grid-template-columns: 1.1fr 0.6fr 0.6fr 1.7fr;
 }
 
 .leaveDetailCell {
-  padding: 0.85rem 1.1rem;
-  font-size: 0.85rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
   color: #1f2937;
-  border-right: 1px solid #e2e8f0;
+  border-right: 1px solid #cbd5e1;
   display: flex;
   align-items: center;
   word-break: break-word;
@@ -306,9 +646,27 @@
   color: #0f172a;
 }
 
+.leaveDetailCellValue.leaveApprovalStatusPending {
+  color: #dc2626;
+}
+
+.leaveDetailCellValue.leaveApprovalStatusAccepted {
+  color: #16a34a;
+}
+
+.leaveDetailCellValue.leaveApprovalStatusRejected {
+  color: #dc2626;
+}
+
 .leaveDetailCellDate {
   font-weight: 600;
   color: #374151;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.leaveDetailCellDate .leaveDetailHighlight {
+  white-space: nowrap;
 }
 
 .leaveDetailHighlight {
@@ -389,7 +747,7 @@
   z-index: 1;
   width: 100%;
   max-width: 100%;
-  margin: 0.5rem 0 0;
+  margin: 0.2rem 0 0;
   padding: 0 5px;
   box-sizing: border-box;
   display: flex;
@@ -398,42 +756,37 @@
 }
 
 .leaveTabButton {
-  padding: 0.65rem 1.3rem;
+  padding: 0.45rem 0.9rem;
   border-radius: 0.8rem;
-  border: 1px solid #fbcfe8;
+  border: 1px solid #073b69;
   background: #ffffff;
-  color: #be185d;
-  font-size: 0.88rem;
+  color: #073b69;
+  font-size: 0.8rem;
   font-weight: 700;
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .leaveTabButton:hover {
-  background: #fdf2f8;
+  background: #ffffff;
+  color: #073b69;
+  border-color: #073b69;
 }
 
 .leaveTabButtonActive {
-  background: linear-gradient(135deg, #38bdf8, #f472b6);
+  background: #073b69;
   color: #ffffff;
-  border-color: transparent;
-  box-shadow: 0 8px 18px -8px rgba(190, 24, 93, 0.45);
+  border-color: #073b69;
+  box-shadow: none;
 }
 
 /* Month / Year filter bar — now only rendered above the
    "My Approved Requests" table (see page.js). */
 .leaveFilterBar {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  max-width: 100%;
-  margin: 0.85rem 0 0;
-  padding: 0 5px;
-  box-sizing: border-box;
   display: flex;
   gap: 0.6rem;
   align-items: center;
-  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .leaveFilterSelect {
@@ -447,9 +800,33 @@
   cursor: pointer;
 }
 
+.leaveApprovedSearch {
+  width: 13rem;
+  cursor: text;
+}
+
 @media (max-width: 768px) {
+  .leaveApprovedCardHeader {
+    flex-wrap: wrap;
+  }
+
+  .leaveApprovedCardHeader .leaveFilterBar {
+    width: 100%;
+    margin-left: 0;
+    flex-wrap: wrap;
+  }
+
+  .leaveApprovedSearch {
+    flex: 1 1 100%;
+    width: auto;
+  }
+
   .leaveDetailRow {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .leaveDetailRowHeader .leaveDetailCellDate {
+    grid-column: 1 / -1;
   }
 
   .leaveDetailRowReason .leaveDetailCellSpan {

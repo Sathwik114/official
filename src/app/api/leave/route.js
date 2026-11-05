@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import * as jose from 'jose';
-import { createLeaveRequestWithInitialApproval, getPendingApprovalsForUser, getApprovedRequestsForApprover, getLeaveRequestsForApplicant, hasDuplicateLeaveRequest } from '@/lib/leaveDb';
+import { addCurrentEmployeeDepartmentAndSection, createLeaveRequestWithInitialApproval, getPendingApprovalsForUser, getApprovedRequestsForApprover, getLeaveRequestsForApplicant, hasDuplicateLeaveRequest } from '@/lib/leaveDb';
 import { getLeaveApprovalFlow } from '@/lib/leaveApprovalConfig';
 import { getEmployeeDetails } from '@/lib/payrollDb';
-import { getUserEmail, sendMail, buildLeaveRequestEmailContent, getApprovalLink, getDirectApproveLink, getDirectRejectLink } from '@/lib/mail';
+import { getUserEmail, sendMail, buildLeaveApprovalNotificationEmailContent, getDirectApprovalsLink } from '@/lib/mail';
 import { saveLeaveDocument } from '@/lib/leaveDocumentStorage';
 
 export async function GET() {
@@ -20,9 +20,18 @@ export async function GET() {
     const { payload } = await jose.jwtVerify(token, secret);
     const currentUserUsername = String(payload.username || payload.name || '').trim();
 
-    const pendingApprovals = await getPendingApprovalsForUser(currentUserUsername);
-    const approvedRequests = await getApprovedRequestsForApprover(currentUserUsername);
-    const myRequests = await getLeaveRequestsForApplicant(currentUserUsername);
+    const [pendingApprovalsFromDb, approvedRequestsFromDb, myRequests] = await Promise.all([
+      getPendingApprovalsForUser(currentUserUsername),
+      getApprovedRequestsForApprover(currentUserUsername),
+      getLeaveRequestsForApplicant(currentUserUsername),
+    ]);
+    const requestCount = pendingApprovalsFromDb.length;
+    const approvalRequests = await addCurrentEmployeeDepartmentAndSection([
+      ...pendingApprovalsFromDb,
+      ...approvedRequestsFromDb,
+    ]);
+    const pendingApprovals = approvalRequests.slice(0, requestCount);
+    const approvedRequests = approvalRequests.slice(requestCount);
 
     return NextResponse.json({ pendingApprovals, approvedRequests, myRequests });
   } catch (error) {
@@ -121,10 +130,6 @@ export async function POST(request) {
 
     const applicantEmployee = await getEmployeeDetails(applicantId);
     const currentApproverName = (approvalFlow.initialApprover ? await getEmployeeDetails(String(approvalFlow.initialApprover).trim()).catch(() => null) : null)?.EmpName || approvalFlow.initialApprover;
-    const nextApproverName = approvalFlow.flow[1]
-      ? (await getEmployeeDetails(String(approvalFlow.flow[1]).trim()).catch(() => null))?.EmpName || approvalFlow.flow[1]
-      : '';
-
     const savedLeaveRequest = await createLeaveRequestWithInitialApproval({
       applicantId: String(applicantId),
       applicantName: applicantName || applicantEmployee?.EmpName || '',
@@ -199,15 +204,23 @@ export async function POST(request) {
       CccStatus: savedLeaveRequest.CccStatus || 'PENDING',
     };
 
-    const { html, text } = buildLeaveRequestEmailContent(emailRequest, {
-      action: 'Submitted',
-      currentApproverName,
-      nextApproverName,
-      status: 'PENDING',
-      senderName: 'HR Department',
-      approvalLink: getApprovalLink(leaveId, approvalFlow.initialApprover),
-      directApproveLink: getDirectApproveLink(leaveId, approvalFlow.initialApprover),
-      directRejectLink: getDirectRejectLink(leaveId, approvalFlow.initialApprover),
+    const { html, text } = buildLeaveApprovalNotificationEmailContent({
+      applicantId: emailRequest.applicantId,
+      applicantName: emailRequest.applicantName,
+      department: emailRequest.department,
+      startDate: emailRequest.startDate,
+      endDate: emailRequest.endDate,
+      leaveType: emailRequest.leaveType,
+      totalDays: emailRequest.totalDays,
+      reason: emailRequest.reason,
+      approvalLink: await getDirectApprovalsLink(approvalFlow.initialApprover, {
+        TranId: emailRequest.TranId,
+        EmpCode: emailRequest.applicantId,
+        EmpName: emailRequest.applicantName,
+        StartDate: emailRequest.startDate,
+        EndDate: emailRequest.endDate,
+        LeaveType: emailRequest.leaveType,
+      }),
     });
 
     try {

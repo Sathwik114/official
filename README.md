@@ -10,6 +10,25 @@ Internet Explorer is not supported by Next.js 16 / React 19. Supporting IE
 would require replacing the current framework stack; adding polyfills alone is
 not sufficient.
 
+## Direct email approvals
+
+Approver notification emails link to `/approve-leaves-direct` and show only
+requests currently assigned to the link's approver. Tokens are revoked after
+40 days in the database, while the email states that the link expires after
+35 days.
+Tokens are random bearer credentials, and anyone who obtains a
+link can act as that approver until it expires or is revoked. Token hashes and
+leave details (transaction ID, employee code/name, dates, and leave type) are
+stored in `OfficialLeave.dbo.DirectApprovalTokens`. `RevokedAt` stores the
+expiry timestamp for active links; revoke all links for an approver with
+`revokeDirectApprovalTokensForApprover` from `src/lib/leaveDb.js` or by setting
+`RevokedAt = GETDATE()` for that approver's active rows. Existing rows without a
+`RevokedAt` value and currently active links are migrated to expire 40 days
+after `CreatedAt`. Set `APP_URL` (or
+`NEXT_PUBLIC_APP_URL`) to the application's reachable HTTPS base URL before
+enabling email approvals. Approvers can also sign in and use the normal
+dashboard.
+
 ## Getting Started
 
 First, run the development server:

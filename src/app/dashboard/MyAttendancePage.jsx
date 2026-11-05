@@ -606,60 +606,62 @@ export default function MyAttendancePage({ empcode }) {
       <div className="dashboardBlob dashboardBlobTwo" />
 
       <div className="dashboardAttendance">
-        <div className="hodFilterBar">
-          <div className="hodFilterField">
-            <label>Month:</label>
-            <select
-              value={month}
-              onChange={(e) => setMonth(parseInt(e.target.value, 10))}
-            >
-              {monthNames.map((m, i) => (
-                <option key={m} value={i + 1}>
-                  {m}
-                </option>
-              ))}
-            </select>
+        <div className="hodFilterBar attendancePageFilterBar">
+          <div className="hodSelectedInfo attendancePageInfo">
+            <div>
+              <strong>Employee:</strong>
+              <span className="hodHighlightValue">
+                {employee?.EmpName || empcode}
+              </span>
+            </div>
+            <div>
+              <strong>Department:</strong>
+              <span className="hodHighlightValue">
+                {employee?.DeptCode || '-'}
+              </span>
+            </div>
           </div>
 
-          <div className="hodFilterField">
-            <label>Year:</label>
-            <input
-              type="number"
-              className="yearInput"
-              value={year}
-              onChange={(e) => {
-                const val = parseInt(e.target.value, 10);
-                setYear(Number.isNaN(val) ? new Date().getFullYear() : val);
-              }}
-              min="2000"
-              max="2100"
-            />
-          </div>
+          <div className="attendancePageControls">
+            <div className="hodFilterField">
+              <label>Month:</label>
+              <select
+                value={month}
+                onChange={(e) => setMonth(parseInt(e.target.value, 10))}
+              >
+                {monthNames.map((m, i) => (
+                  <option key={m} value={i + 1}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          <div className="attendanceExportActions" style={{ display: 'none' }}>
-            <button
-              type="button"
-              className="downloadExcelButton"
-              onClick={handleDownloadExcel}
-              disabled={exporting || loading || attendance.length === 0}
-            >
-              {exporting ? 'Exporting...' : '📊 Download Excel'}
-            </button>
-          </div>
-        </div>
+            <div className="hodFilterField">
+              <label>Year:</label>
+              <input
+                type="number"
+                className="yearInput"
+                value={year}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  setYear(Number.isNaN(val) ? new Date().getFullYear() : val);
+                }}
+                min="2000"
+                max="2100"
+              />
+            </div>
 
-        <div className="hodSelectedInfo">
-          <div>
-            <strong>Employee:</strong>
-            <span className="hodHighlightValue">
-              {employee?.EmpName || empcode}
-            </span>
-          </div>
-          <div>
-            <strong>Department:</strong>
-            <span className="hodHighlightValue">
-              {employee?.DeptCode || '-'}
-            </span>
+            <div className="attendanceExportActions">
+              <button
+                type="button"
+                className="downloadExcelButton"
+                onClick={handleDownloadExcel}
+                disabled={exporting || loading || attendance.length === 0}
+              >
+                {exporting ? 'Exporting...' : '📊 Download Excel'}
+              </button>
+            </div>
           </div>
         </div>
 

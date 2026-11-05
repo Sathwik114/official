@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 
 function timeParts(value) {
@@ -62,33 +62,18 @@ function TimeEditor({ value, onChange, onSave, saving }) {
 }
 
 export default function AttendanceTable({ empcode, employee, attendance, canApplyLeave }) {
-  const [displayAttendance, setDisplayAttendance] = useState(attendance);
   const [viewMode, setViewMode] = useState('current');
+  const [previousAttendance, setPreviousAttendance] = useState([]);
   const [loadingPrevious, setLoadingPrevious] = useState(false);
-  const [times, setTimes] = useState(() => Object.fromEntries(attendance.map((row, index) => {
-    const key = rowKey(row, index);
-    return [key, initialRowTimes(row)];
-  })));
+  const [times, setTimes] = useState({});
   // Tracks which rows currently show the dropdown editors. Defaults to
   // closed (plain-text view) for every row; the pencil icon toggles it open.
   const [editingRows, setEditingRows] = useState({});
   const [saving, setSaving] = useState('');
   const [message, setMessage] = useState('');
 
+  const displayAttendance = viewMode === 'previous' ? previousAttendance : attendance;
   const showPreviousButton = new Date().getDate() <= 3;
-
-  useEffect(() => {
-    setDisplayAttendance(attendance);
-    setViewMode('current');
-  }, [attendance]);
-
-  useEffect(() => {
-    setTimes(Object.fromEntries(displayAttendance.map((row, index) => {
-      const key = rowKey(row, index);
-      return [key, initialRowTimes(row)];
-    })));
-    setEditingRows({});
-  }, [displayAttendance]);
 
   function getRowTimes(row, key) {
     return times[key] || initialRowTimes(row);
@@ -99,13 +84,13 @@ export default function AttendanceTable({ empcode, employee, attendance, canAppl
   }
 
   function toggleEdit(key, row) {
-    setEditingRows((current) => {
-      const nextValue = !current[key];
-      if (!nextValue) {
-        resetRowTimes(row, key);
-      }
-      return { ...current, [key]: nextValue };
-    });
+    const nextValue = !editingRows[key];
+    if (nextValue) {
+      setTimes((current) => ({ ...current, [key]: initialRowTimes(row) }));
+    } else {
+      resetRowTimes(row, key);
+    }
+    setEditingRows((current) => ({ ...current, [key]: nextValue }));
   }
 
   async function loadPreviousMonthRows() {
@@ -125,7 +110,7 @@ export default function AttendanceTable({ empcode, employee, attendance, canAppl
         Department: row.Department || employee?.DeptCode || '-',
       }));
 
-      setDisplayAttendance(previousRows);
+      setPreviousAttendance(previousRows);
       setViewMode('previous');
       if (!previousRows.length) {
         setMessage('No previous month rows were found.');
@@ -187,7 +172,7 @@ export default function AttendanceTable({ empcode, employee, attendance, canAppl
           </button>
         )}
         {viewMode === 'previous' && (
-          <button type="button" onClick={() => { setDisplayAttendance(attendance); setViewMode('current'); setMessage('Showing current month attendance.'); }}>
+          <button type="button" onClick={() => { setViewMode('current'); setMessage('Showing current month attendance.'); }}>
             Show Current Month
           </button>
         )}

@@ -6,6 +6,7 @@
   min-height: 100vh;
   width: 100vw;
   padding: 8rem 6rem 3rem 1rem;
+  background-color: #f1f5f9;
   background-image: url('/images/bg_image.png');
   background-size: 100% 100%;
   background-position: center;
@@ -159,28 +160,40 @@
 
 .loginButton {
   width: 100%;
-  padding: 0.8rem 1rem;
+  min-height: 2.75rem;
+  padding: 0.7rem 1rem;
   border: none;
-  border-radius: 0.85rem;
+  border-radius: 0.55rem;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 0.9rem;
   color: #fff;
-  background: linear-gradient(90deg, #0284c7, #be185d);
+  background: #15803d;
   cursor: pointer;
-  box-shadow: 0 12px 24px -10px rgba(190, 24, 93, 0.45);
+  box-shadow: 0 2px 5px rgba(21, 128, 61, 0.2);
   margin-top: 0.15rem;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .loginButton:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 16px 28px -10px rgba(190, 24, 93, 0.55);
+  background: #166534;
+  box-shadow: 0 3px 8px rgba(21, 128, 61, 0.28);
+}
+
+.loginButton:focus-visible {
+  outline: 3px solid rgba(21, 128, 61, 0.3);
+  outline-offset: 2px;
+}
+
+.loginButton.loginButtonSuccess,
+.loginButton.loginButtonSuccess:hover {
+  background: #166534;
+  font-size: 1.25rem;
 }
 
 .loginButton:disabled {
   opacity: 0.6;
   cursor: not-allowed;
-  transform: none;
+  box-shadow: none;
 }
 
 @media (max-width: 768px) {

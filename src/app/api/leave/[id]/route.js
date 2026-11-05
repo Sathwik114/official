@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server';
 import { addLeaveApproval, getLeaveRequestById, updateLeaveRequestRejection, updateLeaveRequestStatus } from '@/lib/leaveDb';
 import { getEmployeeDetails } from '@/lib/payrollDb';
-import { getUserEmail, sendMail, buildLeaveRequestEmailContent, getApprovalStatusesForEmail, getApprovalLink, getDirectApproveLink, getDirectRejectLink } from '@/lib/mail';
+import { getUserEmail, sendMail, buildLeaveRequestEmailContent, buildLeaveApprovalNotificationEmailContent, getApprovalStatusesForEmail, getDirectApprovalsLink } from '@/lib/mail';
+import { getAuthenticatedUserId } from '@/lib/auth';
 
 export async function POST(request, { params }) {
   try {
+    const currentUserId = await getAuthenticatedUserId();
+    if (!currentUserId) {
+      return NextResponse.json({ error: 'Not authenticated.' }, { status: 401 });
+    }
+
     const { id } = await params;
     const leaveRequestId = Number(id);
 
@@ -17,7 +23,7 @@ export async function POST(request, { params }) {
       body = Object.fromEntries(formData.entries());
     }
 
-    const { approverId, decision, remarks, approvalFlow } = body;
+    const { decision, remarks } = body;
     const leaveRequest = await getLeaveRequestById(leaveRequestId);
 
     if (!leaveRequest) {
@@ -25,17 +31,27 @@ export async function POST(request, { params }) {
     }
 
     const requestCurrentApproverId = String(leaveRequest.CurrentApproverId || '').trim();
-    const flow = String(approvalFlow || leaveRequest.ApprovalFlow || '').split(',').filter(Boolean);
-    const currentStep = flow.indexOf(requestCurrentApproverId);
-    const nextApprover = flow[currentStep + 1] || null;
-
-    if (!requestCurrentApproverId) {
-      return NextResponse.json({ error: 'No active approver is assigned to this request.' }, { status: 400 });
+    if (String(leaveRequest.Status || '').toUpperCase() !== 'PENDING' || requestCurrentApproverId !== currentUserId) {
+      return NextResponse.json({ error: 'This request is not pending with the signed-in user.' }, { status: 403 });
     }
 
-    const approvedBy = String(approverId || requestCurrentApproverId || '').trim();
-    const decisionValue = String(decision || 'APPROVED').toUpperCase();
+    const flow = String(leaveRequest.ApprovalFlow || '').split(',').map((approver) => approver.trim()).filter(Boolean);
+    const currentStep = flow.indexOf(currentUserId);
+    const nextApprover = flow[currentStep + 1] || null;
 
+    if (currentStep === -1) {
+      return NextResponse.json({ error: 'Signed-in user is not configured in this request’s approval flow.' }, { status: 403 });
+    }
+
+    const decisionValue = String(decision || 'APPROVED').toUpperCase();
+    if (!['APPROVED', 'REJECTED'].includes(decisionValue)) {
+      return NextResponse.json({ error: 'Decision must be APPROVED or REJECTED.' }, { status: 400 });
+    }
+    if (decisionValue === 'REJECTED' && !String(remarks || '').trim()) {
+      return NextResponse.json({ error: 'A rejection reason is required.' }, { status: 400 });
+    }
+
+    const approvedBy = currentUserId;
     await addLeaveApproval(leaveRequestId, approvedBy, decisionValue, remarks || '', currentStep + 1);
     if (decisionValue === 'REJECTED') {
       await updateLeaveRequestRejection(leaveRequestId, approvedBy, remarks || '', currentStep + 1);
@@ -50,9 +66,6 @@ export async function POST(request, { params }) {
     }
 
     const approverName = (await getEmployeeDetails(approvedBy).catch(() => null))?.EmpName || approvedBy;
-    const nextApproverName = nextApprover
-      ? (await getEmployeeDetails(nextApprover).catch(() => null))?.EmpName || nextApprover
-      : '';
     const applicantEmployee = await getEmployeeDetails(leaveRequest.ApplicantId);
 
     const emailRequest = {
@@ -93,15 +106,23 @@ export async function POST(request, { params }) {
       if (nextApprover) {
         recipientEmail = getUserEmail(nextApprover);
         emailSubject = `Leave Request Approved by ${approverName} - Next Approval Required`;
-        emailContent = buildLeaveRequestEmailContent(emailRequest, {
-          action: 'Approved',
-          currentApproverName: approverName,
-          nextApproverName,
-          status: 'PENDING',
-          senderName: approverName,
-          approvalLink: getApprovalLink(leaveRequestId, nextApprover),
-          directApproveLink: getDirectApproveLink(leaveRequestId, nextApprover),
-          directRejectLink: getDirectRejectLink(leaveRequestId, nextApprover),
+        emailContent = buildLeaveApprovalNotificationEmailContent({
+          applicantId: emailRequest.applicantId,
+          applicantName: emailRequest.applicantName,
+          department: emailRequest.department,
+          startDate: emailRequest.startDate,
+          endDate: emailRequest.endDate,
+          leaveType: emailRequest.leaveType,
+          totalDays: emailRequest.totalDays,
+          reason: emailRequest.reason,
+          approvalLink: await getDirectApprovalsLink(nextApprover, {
+            TranId: emailRequest.TranId,
+            EmpCode: emailRequest.applicantId,
+            EmpName: emailRequest.applicantName,
+            StartDate: emailRequest.startDate,
+            EndDate: emailRequest.endDate,
+            LeaveType: emailRequest.leaveType,
+          }),
         });
       }
     } else if (decisionValue === 'REJECTED') {

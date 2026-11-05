@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import './page.css';
 
 function to24HourMinutes(hour, min, period) {
@@ -145,7 +145,6 @@ function formatApprovalFlowEntry(approverId, fallbackName = '') {
 
 export default function ApplyLeaveForm({ employee, currentUserUsername, approvalFlow }) {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const empcode = searchParams.get('empcode') || '';
 
   const [leaveType, setLeaveType] = useState('');
@@ -190,21 +189,37 @@ export default function ApplyLeaveForm({ employee, currentUserUsername, approval
   const isVipLeaveRequest = approvalFlow?.role === 'vip';
   const balanceExceeded = !isVipLeaveRequest && (exceedsElBalance || exceedsSlBalance);
 
-  // Auto-sync End Date/Time to Start Date + 1 hour whenever "1 Hour" leave
-  // type is selected, or the start date/time changes while it's selected.
-  useEffect(() => {
-    if (leaveType !== '1Hour') return;
-    if (!startDate) return;
-
-    const next = addOneHour(startHour, startMin, startPeriod);
-    setEndDate(startDate);
+  function syncOneHourEndTime(date, hour, minute, period) {
+    if (!date) return;
+    const next = addOneHour(hour, minute, period);
+    setEndDate(date);
     setEndHour(next.hour);
     setEndMin(next.min);
     setEndPeriod(next.period);
-  }, [leaveType, startDate, startHour, startMin, startPeriod]);
+  }
+
+  function handleStartTimeChange(part, value) {
+    const nextStartTime = {
+      hour: part === 'hour' ? value : startHour,
+      minute: part === 'minute' ? value : startMin,
+      period: part === 'period' ? value : startPeriod,
+    };
+
+    setStartHour(nextStartTime.hour);
+    setStartMin(nextStartTime.minute);
+    setStartPeriod(nextStartTime.period);
+    if (leaveType === '1Hour') {
+      syncOneHourEndTime(startDate, nextStartTime.hour, nextStartTime.minute, nextStartTime.period);
+    }
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => {
+      if (leaveType === '1Hour') {
+        setTotalDays('0.13');
+        return;
+      }
+
       if (startDate && endDate) {
       const halfDayLeaveType = getHalfDayLeaveType(
         leaveType,
@@ -215,7 +230,7 @@ export default function ApplyLeaveForm({ employee, currentUserUsername, approval
       );
 
       if (halfDayLeaveType) {
-        setTotalDays(leaveType === '1Hour' ? '0' : '0.5');
+        setTotalDays('0.5');
         return;
       }
 
@@ -393,7 +408,7 @@ export default function ApplyLeaveForm({ employee, currentUserUsername, approval
       }
 
       setSubmitMessage(`Leave application submitted successfully. First approval is pending with ${data.currentApproverName || data.currentApprover || 'the configured approver'}.`);
-      setTimeout(() => router.push('/dashboard/my-leaves'), 1200);
+      setTimeout(() => window.location.assign('/dashboard/my-leaves'), 1200);
     } catch (err) {
       console.error('Leave submission failed:', err);
       setSubmitError(err.message || 'Leave submission failed.');
@@ -488,21 +503,26 @@ export default function ApplyLeaveForm({ employee, currentUserUsername, approval
                 <div className="leaveDateHalfInner">
                   <DatePicker
                     date={startDate}
-                    onChange={setStartDate}
+                    onChange={(date) => {
+                      setStartDate(date);
+                      if (leaveType === '1Hour') {
+                        syncOneHourEndTime(date, startHour, startMin, startPeriod);
+                      }
+                    }}
                     label="Start date"
                   />
                   <div className="leaveTimeInline">
-                    <select value={startHour} onChange={(e) => setStartHour(e.target.value)}>
+                    <select value={startHour} onChange={(e) => handleStartTimeChange('hour', e.target.value)}>
                       {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map((h) => (
                         <option key={h} value={h}>{h}</option>
                       ))}
                     </select>
-                    <select value={startMin} onChange={(e) => setStartMin(e.target.value)}>
+                    <select value={startMin} onChange={(e) => handleStartTimeChange('minute', e.target.value)}>
                       {['00','05','10','15','20','25','30','35','40','45','50','55'].map((m) => (
                         <option key={m} value={m}>{m}</option>
                       ))}
                     </select>
-                    <select value={startPeriod} onChange={(e) => setStartPeriod(e.target.value)}>
+                    <select value={startPeriod} onChange={(e) => handleStartTimeChange('period', e.target.value)}>
                       <option value="AM">AM</option>
                       <option value="PM">PM</option>
                     </select>
@@ -556,7 +576,16 @@ export default function ApplyLeaveForm({ employee, currentUserUsername, approval
 
               <div className="leaveDateHalf leaveDateHalfTotal">
                 <label className="leaveDateHeading">Leave Type <span className="requiredMark" aria-hidden="true">*</span></label>
-                <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)}>
+                <select
+                  value={leaveType}
+                  onChange={(e) => {
+                    const nextLeaveType = e.target.value;
+                    setLeaveType(nextLeaveType);
+                    if (nextLeaveType === '1Hour') {
+                      syncOneHourEndTime(startDate, startHour, startMin, startPeriod);
+                    }
+                  }}
+                >
                   <option value="">Select type</option>
                   <option value="EL">EL</option>
                   <option value="SL">SL</option>

@@ -11,7 +11,6 @@ export default function LeaveApprovalPanel() {
   const [message, setMessage] = useState('');
 
   async function loadData() {
-    setLoading(true);
     try {
       const res = await fetch('/api/leave');
       const data = await res.json();
@@ -45,6 +44,7 @@ export default function LeaveApprovalPanel() {
       }
 
       setMessage(`Approved successfully. ${data.nextApprover ? `Next approver: ${data.nextApprover}` : 'Request completed.'}`);
+      setLoading(true);
       await loadData();
     } catch (err) {
       setMessage(err.message || 'Approval failed');
@@ -52,7 +52,26 @@ export default function LeaveApprovalPanel() {
   }
 
   useEffect(() => {
-    loadData();
+    let active = true;
+    fetch('/api/leave')
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to load leave approvals.');
+        if (active) {
+          setPendingApprovals(data.pendingApprovals || []);
+          setMyRequests(data.myRequests || []);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load leave approvals:', err);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   return (

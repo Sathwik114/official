@@ -96,6 +96,39 @@ export async function ensureLeaveDocumentTable() {
   `);
 }
 
+export async function getLeaveDocumentTranIds(tranIds = []) {
+  const normalizedTranIds = Array.from(new Set(
+    tranIds.map((tranId) => String(tranId || '').trim()).filter(Boolean)
+  ));
+  if (!normalizedTranIds.length) return [];
+
+  await ensureLeaveDocumentTable();
+
+  const pool = await getAttmSystemPool();
+  const availableTranIds = [];
+
+  for (let offset = 0; offset < normalizedTranIds.length; offset += 1000) {
+    const batch = normalizedTranIds.slice(offset, offset + 1000);
+    const request = pool.request();
+    const parameters = batch.map((tranId, index) => {
+      const parameterName = `TranId${index}`;
+      request.input(parameterName, sql.NVarChar(20), tranId);
+      return `@${parameterName}`;
+    });
+
+    const result = await request.query(`
+      SELECT DISTINCT TranId
+      FROM dbo.OnlineLeavePDF
+      WHERE TranId IN (${parameters.join(', ')})
+        AND DATALENGTH(PdfFile) > 0
+    `);
+
+    availableTranIds.push(...(result.recordset || []).map((row) => String(row.TranId || '').trim()));
+  }
+
+  return availableTranIds;
+}
+
 export async function saveLeaveDocument(tranId, file, originalName = '', originalMimeType = '') {
   const normalizedTranId = String(tranId || '').trim();
   if (!normalizedTranId) {

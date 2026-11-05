@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { getCalendarDateParts } from '@/lib/leaveDateUtils';
+import { createDirectApprovalToken } from '@/lib/directApprovalToken';
 
 const SMTP_HOST = process.env.SMTP_HOST;
 const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
@@ -8,6 +9,7 @@ const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
 const SMTP_AUTH_METHOD = process.env.SMTP_AUTH_METHOD?.trim();
 const MAIL_FROM = process.env.MAIL_FROM || SMTP_USER;
+const MAIL_FROM_ADDRESS = MAIL_FROM?.match(/<([^>]+)>/)?.[1]?.trim() || MAIL_FROM;
 const APP_URL = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://10.40.10.125:7000';
 const APPROVAL_APP_URL = APP_URL;
 
@@ -34,6 +36,101 @@ const transporter = nodemailer.createTransport({
 
 function normalizeUserId(userId) {
   return String(userId || '').trim();
+}
+
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character]);
+}
+
+export function buildLeaveApprovalNotificationEmailContent({
+  applicantId,
+  applicantName,
+  department,
+  startDate,
+  endDate,
+  leaveType,
+  totalDays,
+  reason,
+  approvalLink,
+}) {
+  const safeApplicantName = escapeHtml(applicantName || 'An employee');
+  const safeApplicantId = escapeHtml(applicantId || '-');
+  const safeDepartment = escapeHtml(department || '-');
+  const safeStartDate = escapeHtml(formatEmailCalendarDate(startDate));
+  const safeEndDate = escapeHtml(formatEmailCalendarDate(endDate));
+  const safeLeaveType = escapeHtml(leaveType || '-');
+  const safeTotalDays = escapeHtml(totalDays ?? '-');
+  const safeReason = escapeHtml(reason || '-');
+  const safeApprovalLink = escapeHtml(approvalLink);
+  const labelStyle = 'padding:8px;border:1px solid #ddd;white-space:nowrap;text-align:left;';
+  const valueStyle = 'padding:8px;border:1px solid #ddd;text-align:left;';
+
+  return {
+    html: `
+      <div style="font-family:Arial,sans-serif;color:#1e293b;max-width:600px;margin:0 auto;padding:24px;">
+        <h2 style="margin-top:0;">Leave approval required</h2>
+        <p>The following Employee was Applied for a Leave, waiting for your approval.</p>
+        <table style="border-collapse:collapse;width:100%;margin:16px 0;table-layout:fixed;">
+          <colgroup>
+            <col style="width:16%;">
+            <col style="width:34%;">
+            <col style="width:16%;">
+            <col style="width:34%;">
+          </colgroup>
+          <tbody>
+            <tr>
+              <td style="${labelStyle}"><strong>Emp name</strong></td>
+              <td colspan="3" style="${valueStyle}">${safeApplicantName}</td>
+            </tr>
+            <tr>
+              <td style="${labelStyle}"><strong>Emp code</strong></td>
+              <td style="${valueStyle}">${safeApplicantId}</td>
+              <td style="${labelStyle}"><strong>Department</strong></td>
+              <td style="${valueStyle}">${safeDepartment}</td>
+            </tr>
+            <tr>
+              <td style="${labelStyle}"><strong>Start date</strong></td>
+              <td style="${valueStyle}">${safeStartDate}</td>
+              <td style="${labelStyle}"><strong>End date</strong></td>
+              <td style="${valueStyle}">${safeEndDate}</td>
+            </tr>
+            <tr>
+              <td style="${labelStyle}"><strong>Leave type</strong></td>
+              <td style="${valueStyle}">${safeLeaveType}</td>
+              <td style="${labelStyle}"><strong>Total days</strong></td>
+              <td style="${valueStyle}">${safeTotalDays}</td>
+            </tr>
+            <tr>
+              <td style="${labelStyle}"><strong>Reason</strong></td>
+              <td colspan="3" style="${valueStyle}white-space:normal;overflow-wrap:anywhere;word-break:break-word;">${safeReason}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p><a href="${safeApprovalLink}" style="display:inline-block;padding:12px 20px;background:#ffffff;color:#dc2626;border:1px solid #dc2626;text-decoration:none;border-radius:6px;font-weight:700;">Review pending leave requests</a></p>
+        <p style="font-size:12px;color:#64748b;">Use the secure link above to review and take action on all pending leave requests directly. This link expires after 35 days.</p>
+      </div>
+    `,
+    text: [
+      'Leave approval required',
+      `A leave request from ${applicantName || 'an employee'} is waiting for your approval.`,
+      `Empcode: ${applicantId || '-'}`,
+      `Emp name: ${applicantName || '-'}`,
+      `Department: ${department || '-'}`,
+      `Start date: ${formatEmailCalendarDate(startDate)}`,
+      `End date: ${formatEmailCalendarDate(endDate)}`,
+      `Leave type: ${leaveType || '-'}`,
+      `Total days: ${totalDays ?? '-'}`,
+      `Reason: ${reason || '-'}`,
+      `Review pending leave requests: ${approvalLink}`,
+      'Use the secure link above to review and take action on all pending leave requests directly. This link expires after 35 days.',
+    ].join('\n'),
+  };
 }
 
 export function getUserEmail(userId) {
@@ -100,26 +197,18 @@ function formatDate(value, timeString) {
   return `${day}/${month}/${year} ${formattedHours}:${minutes} ${ampm}`;
 }
 
-function formatSectionRow(label, value) {
-  return `
-    <tr>
-      <td style="padding: 8px; border: 1px solid #ddd;"><strong>${label}</strong></td>
-      <td style="padding: 8px; border: 1px solid #ddd;">${value || '-'}</td>
-    </tr>
-  `;
+function formatEmailCalendarDate(value) {
+  const date = getCalendarDateParts(value);
+  if (!date) return value ? String(value) : '-';
+  return `${String(date.day).padStart(2, '0')}/${String(date.month).padStart(2, '0')}/${date.year}`;
 }
 
 export function buildLeaveRequestEmailContent(request, options = {}) {
   const {
     action = 'Submitted',
-    currentApproverName = '',
-    nextApproverName = '',
     status = 'PENDING',
     remarks = '',
     senderName = 'HR Department',
-    approvalLink = '',
-    directApproveLink = '',
-    directRejectLink = '',
   } = options;
 
   const approvalFlow = Array.isArray(request.approvalFlow)
@@ -241,27 +330,6 @@ export function buildLeaveRequestEmailContent(request, options = {}) {
         <div style="padding: 0 24px 24px 24px; text-align: center; background-color: #fafafa; border-top: 1px solid #f1f5f9;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin: 20px auto 8px auto;">
             <tr>
-              ${directApproveLink ? `
-              <td style="padding: 0 6px;">
-                <a href="${directApproveLink}" style="display: inline-block; padding: 11px 18px; background-color: #ffffff; color: #16a34a; border: 1px solid #16a34a; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; white-space: nowrap;">
-                  Click Here to Approve
-                </a>
-              </td>
-              ` : ''}
-              ${directRejectLink ? `
-              <td style="padding: 0 6px;">
-                <a href="${directRejectLink}" style="display: inline-block; padding: 11px 18px; background: #ffffff; color: #dc2626; border: 1px solid #dc2626; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; white-space: nowrap;">
-                  Reject Request
-                </a>
-              </td>
-              ` : ''}
-              ${approvalLink ? `
-              <td style="padding: 0 6px;">
-                <a href="${approvalLink}" style="display: inline-block; padding: 11px 18px; background: #ffffff; color: #0284c7; border: 1px solid #0284c7; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 13px; white-space: nowrap;">
-                  Go to Website
-                </a>
-              </td>
-              ` : ''}
             </tr>
           </table>
           <p style="margin: 8px 0 0 0; font-size: 12px; color: #64748b;">This email was automatically generated by the Leave Management System.</p>
@@ -291,9 +359,6 @@ export function buildLeaveRequestEmailContent(request, options = {}) {
     `Contact Number: ${request.contactNumber || '-'}`,
     `HoD Status: ${request.HodStatus || 'PENDING'}`,
     `CCC Status: ${request.CccStatus || 'PENDING'}`,
-    `Direct Approve Link: ${directApproveLink || '-'}`,
-    `Direct Reject Link: ${directRejectLink || '-'}`,
-    `Approval Link: ${approvalLink || '-'}`,
     `Remarks: ${remarks || '-'}`,
     `Sender: ${senderName}`,
   ].join('\n');
@@ -301,40 +366,13 @@ export function buildLeaveRequestEmailContent(request, options = {}) {
   return { html, text };
 }
 
-export function getApprovalLink(leaveId, approverId) {
-  const id = String(leaveId || '').trim();
-  if (!id) return '';
+export async function getDirectApprovalsLink(approverId, leaveRequest) {
+  const normalizedApproverId = normalizeUserId(approverId);
+  if (!normalizedApproverId) return '';
 
-  const url = new URL(`${APPROVAL_APP_URL}/dashboard/leave-approvals`);
-  url.searchParams.set('requestId', id);
-  if (approverId) {
-    url.searchParams.set('approver', normalizeUserId(approverId));
-  }
-  return url.toString();
-}
-
-export function getDirectApproveLink(leaveId, approverId) {
-  const id = String(leaveId || '').trim();
-  if (!id) return '';
-
-  const url = new URL(`${APPROVAL_APP_URL}/api/leave/approve-direct`);
-  url.searchParams.set('id', id);
-  if (approverId) {
-    url.searchParams.set('approver', normalizeUserId(approverId));
-  }
-  return url.toString();
-}
-
-export function getDirectRejectLink(leaveId, approverId) {
-  const id = String(leaveId || '').trim();
-  if (!id) return '';
-
-  const url = new URL(`${APPROVAL_APP_URL}/api/leave/approve-direct`);
-  url.searchParams.set('id', id);
-  url.searchParams.set('action', 'reject');
-  if (approverId) {
-    url.searchParams.set('approver', normalizeUserId(approverId));
-  }
+  const token = await createDirectApprovalToken(normalizedApproverId, leaveRequest);
+  const url = new URL(`${APPROVAL_APP_URL}/approve-leaves-direct`);
+  url.searchParams.set('token', token);
   return url.toString();
 }
 
@@ -348,7 +386,10 @@ export async function sendMail({ to, subject, html, text }) {
   }
 
   const result = await transporter.sendMail({
-    from: MAIL_FROM,
+    from: {
+      name: 'Leave Application',
+      address: MAIL_FROM_ADDRESS,
+    },
     to,
     subject,
     text,
