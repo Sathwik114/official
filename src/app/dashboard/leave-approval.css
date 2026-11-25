@@ -221,12 +221,88 @@ body.directApprovalDocument::-webkit-scrollbar-track {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 2.0rem;
   margin-bottom: 0.65rem;
 }
 
 .leaveApprovedCardHeader h2 {
   margin: 0;
+  line-height: 2rem;
+}
+
+.leaveApprovalFlowBanner {
+  display: flex;
+  flex: 0 1 auto;
+  margin-left: auto;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 1.96rem;
+  padding: 0 0.65rem;
+  border: 1px solid #073b69;
+  border-radius: 0.8rem;
+  background-color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  white-space: normal;
+  box-sizing: border-box;
+}
+
+.leaveApprovalFlowStep {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 1.6rem;
+  padding: 0.2rem 0.45rem;
+  border: 1px solid transparent;
+  border-radius: 0.55rem;
+  font-size: 0.72rem;
+  line-height: 1;
+  overflow-wrap: anywhere;
+  box-sizing: border-box;
+}
+
+.leaveApprovalFlowLabel {
+  flex: 0 0 auto;
+  color: #075985;
+  font-size: inherit;
+  font-weight: 800;
+}
+
+.leaveApprovalFlowPrompt {
+  color: #475569;
+  font-weight: 600;
+}
+
+.leaveApprovalFlowComplete {
+  border-color: #4caf50;
+  background-color: #b7e4bd;
+  color: #111827;
+}
+
+.leaveApprovalFlowPending {
+  border-color: #d94343;
+  background-color: #f0a3a3;
+  color: #111827;
+}
+
+.leaveApprovalFlowOverviewStep {
+  border-color: #073b69;
+  background-color: #073b69;
+  color: #ffffff;
+}
+
+.leaveApprovalFlowArrow {
+  flex: 0 0 auto;
+  color: #334155;
+  font-size: 1.15rem;
+  font-weight: 900;
 }
 
 .leaveApprovedTableScrollWrapper {
@@ -780,32 +856,105 @@ body.directApprovalDocument::-webkit-scrollbar-track {
   box-shadow: none;
 }
 
-/* Month / Year filter bar — now only rendered above the
-   "My Approved Requests" table (see page.js). */
+@media (min-width: 769px) and (max-width: 1100px) {
+  .leaveApprovalFlowBanner {
+    gap: 0.15rem;
+    padding: 0 0.45rem;
+    font-size: 0.68rem;
+  }
+
+  .leaveApprovalFlowStep {
+    min-height: 1.5rem;
+    padding: 0.15rem 0.35rem;
+  }
+}
+
 .leaveFilterBar {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.6rem;
   align-items: center;
   margin-left: auto;
 }
 
 .leaveFilterSelect {
-  padding: 0.45rem 0.7rem;
-  border-radius: 0.6rem;
+  height: 2rem;
+  padding: 0 0.6rem;
+  border-radius: 0.5rem;
   border: 1px solid #fbcfe8;
   background: #ffffff;
   color: #be185d;
-  font-size: 0.82rem;
+  font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
+  line-height: 1;
+  box-sizing: border-box;
 }
 
-.leaveApprovedSearch {
+.leaveRequestSearch {
   width: 13rem;
   cursor: text;
+  line-height: normal;
+}
+
+.leaveYearFilter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 2rem;
+  padding: 0 0.55rem;
+  border: 1px solid #fbcfe8;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  color: #075985;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  box-sizing: border-box;
+}
+
+.leaveYearFilter input {
+  width: 3.5rem;
+  height: 1.5rem;
+  padding: 0 0.25rem;
+  border: 0;
+  background: transparent;
+  font-size: inherit;
+  line-height: 1;
+  box-sizing: border-box;
+}
+
+.leaveClearFiltersButton {
+  height: 2rem;
+  padding: 0 0.6rem;
+  border: 1px solid #073b69;
+  border-radius: 0.5rem;
+  background: #ffffff;
+  color: #073b69;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+  box-sizing: border-box;
+}
+
+.leaveClearFiltersButton:hover {
+  background: #eff6ff;
 }
 
 @media (max-width: 768px) {
+  .leaveTabBar {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .leaveTabBar .leaveApprovalFlowBanner {
+    flex: 0 1 auto;
+    order: 2;
+    flex-wrap: wrap;
+    margin-left: auto;
+  }
+
   .leaveApprovedCardHeader {
     flex-wrap: wrap;
   }
@@ -816,7 +965,11 @@ body.directApprovalDocument::-webkit-scrollbar-track {
     flex-wrap: wrap;
   }
 
-  .leaveApprovedSearch {
+  .leaveApprovedCardHeader .leaveFilterBar {
+    order: 3;
+  }
+
+  .leaveRequestSearch {
     flex: 1 1 100%;
     width: auto;
   }

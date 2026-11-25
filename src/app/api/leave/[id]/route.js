@@ -112,6 +112,8 @@ export async function POST(request, { params }) {
           department: emailRequest.department,
           startDate: emailRequest.startDate,
           endDate: emailRequest.endDate,
+          fromTime: emailRequest.fromTime,
+          toTime: emailRequest.toTime,
           leaveType: emailRequest.leaveType,
           totalDays: emailRequest.totalDays,
           reason: emailRequest.reason,
@@ -130,6 +132,8 @@ export async function POST(request, { params }) {
       emailSubject = `Leave Request Rejected: ${emailRequest.applicantName}`;
       emailContent = buildLeaveRequestEmailContent(emailRequest, {
         action: 'Rejected',
+        rejectedById: approvedBy,
+        rejectedByName: approverName,
         currentApproverName: approverName,
         nextApproverName: '',
         status: 'REJECTED',

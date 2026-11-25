@@ -210,6 +210,8 @@ export async function POST(request) {
       department: emailRequest.department,
       startDate: emailRequest.startDate,
       endDate: emailRequest.endDate,
+      fromTime: emailRequest.fromTime,
+      toTime: emailRequest.toTime,
       leaveType: emailRequest.leaveType,
       totalDays: emailRequest.totalDays,
       reason: emailRequest.reason,

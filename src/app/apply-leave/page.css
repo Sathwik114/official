@@ -426,6 +426,47 @@ input[type="file"]::file-selector-button {
   margin-right: 0.6rem;
 }
 
+.leavePopupBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.leaveValidationPopup {
+  width: min(100%, 28rem);
+  padding: 1.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.6rem;
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.2);
+  text-align: center;
+}
+
+.leaveValidationPopup p {
+  margin: 0 0 1.25rem;
+  color: #1f2937;
+  font-size: 0.95rem;
+}
+
+.leaveValidationPopup button {
+  min-width: 5rem;
+  padding: 0.55rem 1.25rem;
+  border: 0;
+  border-radius: 0.35rem;
+  background: #0369a1;
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.leaveValidationPopup button:hover {
+  background: #075985;
+}
+
 /* Bottom action bar with Submit */
 .leaveFormSubmitRow {
   justify-content: flex-end;

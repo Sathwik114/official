@@ -228,6 +228,8 @@ export async function ensureLeaveTables() {
         CurrentApprover NVARCHAR(100) NOT NULL,
         ApprovedBy NVARCHAR(100) NULL,
         ApprovedAt DATETIME NULL,
+        VPAprveAt DATETIME NULL,
+        PAprveAt DATETIME NULL,
         HodApproval NVARCHAR(100) NULL,
         HodStatus NVARCHAR(50) NULL,
         HodRejectId NVARCHAR(100) NULL,
@@ -253,6 +255,11 @@ export async function ensureLeaveTables() {
     BEGIN
       ALTER TABLE dbo.LeaveRequests ADD ApprovedAt DATETIME NULL;
     END;
+
+    IF COL_LENGTH('dbo.LeaveRequests', 'VPAprveAt') IS NULL
+      ALTER TABLE dbo.LeaveRequests ADD VPAprveAt DATETIME NULL;
+    IF COL_LENGTH('dbo.LeaveRequests', 'PAprveAt') IS NULL
+      ALTER TABLE dbo.LeaveRequests ADD PAprveAt DATETIME NULL;
 
     IF COL_LENGTH('dbo.LeaveRequests', 'FromTime') IS NULL
       ALTER TABLE dbo.LeaveRequests ADD FromTime NVARCHAR(20) NULL;
@@ -708,7 +715,6 @@ export async function createLeaveRequest(payload) {
   await ensureLeaveTables();
   const pool = await getPool();
   const payrollEmployee = await getPayrollEmployeeDetails(payload.applicantId).catch(() => null);
-  const [employeeDisplayDetails] = await getEmployeeDetailsForIds([payload.applicantId]);
 
   // Only pull CAP In/Out time from AttmSystem when the leave type is COFF
   const attendanceTimes = String(payload.leaveType || '').toUpperCase().includes('COFF')
@@ -829,28 +835,6 @@ export async function createLeaveRequest(payload) {
   const savedLeaveRequest = result.recordset[0] || null;
   if (!savedLeaveRequest) return null;
 
-  await pool.request()
-    .input('LeaveRequestId', sql.Int, savedLeaveRequest.Id)
-    .input('TranId', sql.BigInt, savedLeaveRequest.TranId || null)
-    .input('EmpCode', sql.NVarChar(100), savedLeaveRequest.ApplicantId)
-    .input('EmpName', sql.NVarChar(200), savedLeaveRequest.ApplicantName || '')
-    .input('LeaveType', sql.NVarChar(100), savedLeaveRequest.LeaveType)
-    .input('StartDate', sql.DateTime, savedLeaveRequest.StartDate)
-    .input('EndDate', sql.DateTime, savedLeaveRequest.EndDate)
-    .input('Reason', sql.NVarChar(sql.MAX), savedLeaveRequest.Reason || '')
-    .input('Department', sql.NVarChar(200), employeeDisplayDetails?.Department || savedLeaveRequest.Department || '')
-    .input('Section', sql.NVarChar(200), employeeDisplayDetails?.Section || savedLeaveRequest.Section || '')
-    .query(`
-      INSERT INTO dbo.ApprovalTimings (
-        LeaveRequestId, TranId, EmpCode, EmpName, LeaveType, StartDate, EndDate,
-        Reason, Department, Section, VicePresidentApproveStatus, PresidentStatus
-      )
-      VALUES (
-        @LeaveRequestId, @TranId, @EmpCode, @EmpName, @LeaveType, @StartDate, @EndDate,
-        @Reason, @Department, @Section, 'Pending', 'Pending'
-      );
-    `);
-
   // EL and SL balances are informational and are not changed by leave requests.
   return savedLeaveRequest;
 }
@@ -859,7 +843,6 @@ export async function createLeaveRequestWithInitialApproval(payload, approverId)
   await ensureLeaveTables();
   const pool = await getPool();
   const payrollEmployee = await getPayrollEmployeeDetails(payload.applicantId).catch(() => null);
-  const [employeeDisplayDetails] = await getEmployeeDetailsForIds([payload.applicantId]);
 
   // Only pull CAP In/Out time from AttmSystem when the leave type is COFF
   const attendanceTimes = String(payload.leaveType || '').toUpperCase().includes('COFF')
@@ -952,28 +935,6 @@ export async function createLeaveRequestWithInitialApproval(payload, approverId)
         VALUES (@LeaveRequestId, @ApproverId, @Decision, @Remarks, @StepNumber);
       `);
 
-    await transaction.request()
-      .input('LeaveRequestId', sql.Int, savedLeaveRequest.Id)
-      .input('TranId', sql.BigInt, savedLeaveRequest.TranId || null)
-      .input('EmpCode', sql.NVarChar(100), savedLeaveRequest.ApplicantId)
-      .input('EmpName', sql.NVarChar(200), savedLeaveRequest.ApplicantName || '')
-      .input('LeaveType', sql.NVarChar(100), savedLeaveRequest.LeaveType)
-      .input('StartDate', sql.DateTime, savedLeaveRequest.StartDate)
-      .input('EndDate', sql.DateTime, savedLeaveRequest.EndDate)
-      .input('Reason', sql.NVarChar(sql.MAX), savedLeaveRequest.Reason || '')
-      .input('Department', sql.NVarChar(200), employeeDisplayDetails?.Department || savedLeaveRequest.Department || '')
-      .input('Section', sql.NVarChar(200), employeeDisplayDetails?.Section || savedLeaveRequest.Section || '')
-      .query(`
-        INSERT INTO dbo.ApprovalTimings (
-          LeaveRequestId, TranId, EmpCode, EmpName, LeaveType, StartDate, EndDate,
-          Reason, Department, Section, VicePresidentApproveStatus, PresidentStatus
-        )
-        VALUES (
-          @LeaveRequestId, @TranId, @EmpCode, @EmpName, @LeaveType, @StartDate, @EndDate,
-          @Reason, @Department, @Section, 'Pending', 'Pending'
-        );
-      `);
-
     await transaction.commit();
 
     // Balance is NOT deducted here — it's deducted only when the request is
@@ -1020,6 +981,16 @@ export async function updateLeaveRequestStatus(leaveRequestId, currentApprover, 
             ELSE ApprovedBy
           END,
           ApprovedAt = CASE WHEN @ApprovedBy IS NOT NULL AND @ApprovedBy <> '' AND ApprovedAt IS NULL THEN GETDATE() ELSE ApprovedAt END,
+          VPAprveAt = CASE
+            WHEN @ApprovedBy IS NOT NULL AND @ApprovedBy <> '' AND @StepNumber = 1
+              THEN COALESCE(VPAprveAt, GETDATE())
+            ELSE VPAprveAt
+          END,
+          PAprveAt = CASE
+            WHEN @ApprovedBy IS NOT NULL AND @ApprovedBy <> '' AND @StepNumber = 2
+              THEN COALESCE(PAprveAt, GETDATE())
+            ELSE PAprveAt
+          END,
           HodApproval = CASE WHEN @StepNumber = 1 AND @ApprovedBy IS NOT NULL AND @ApprovedBy <> '' THEN @ApprovedBy ELSE HodApproval END,
           HodStatus = CASE WHEN @StepNumber = 1 AND @ApprovedBy IS NOT NULL AND @ApprovedBy <> '' THEN 'Accept' ELSE HodStatus END,
           CccApproval = CASE WHEN @StepNumber = 2 AND @ApprovedBy IS NOT NULL AND @ApprovedBy <> '' THEN @ApprovedBy ELSE CccApproval END,
@@ -1031,16 +1002,14 @@ export async function updateLeaveRequestStatus(leaveRequestId, currentApprover, 
       IF @ApprovedBy IS NOT NULL AND @ApprovedBy <> '' AND @StepNumber = 1
       BEGIN
         UPDATE dbo.ApprovalTimings
-        SET VicePresidentApproveStatus = 'Accept',
-            VicePresidentApprovedAt = COALESCE(VicePresidentApprovedAt, GETDATE())
+        SET VicePresidentApproveStatus = 'Accept'
         WHERE LeaveRequestId = @LeaveRequestId;
       END;
 
       IF @ApprovedBy IS NOT NULL AND @ApprovedBy <> '' AND @StepNumber = 2
       BEGIN
         UPDATE dbo.ApprovalTimings
-        SET PresidentStatus = 'Accept',
-            PresidentApprovedAt = COALESCE(PresidentApprovedAt, GETDATE())
+        SET PresidentStatus = 'Accept'
         WHERE LeaveRequestId = @LeaveRequestId;
       END;
     `);

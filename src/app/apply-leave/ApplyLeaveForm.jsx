@@ -4,6 +4,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 import './page.css';
 
+const NO_LEAVE_DAYS_ERROR = 'The selected date range contains no leave days after excluding Sundays.';
+const ALREADY_APPLIED_ERROR = 'Already applied for the day';
+
 function to24HourMinutes(hour, min, period) {
   let h = parseInt(hour, 10) % 12;
   if (period === 'PM') h += 12;
@@ -29,6 +32,25 @@ function formatDateForInput(date) {
   if (!date) return '';
   const [year, month, day] = date.split('-');
   return `${day}/${month}/${year}`;
+}
+
+function countLeaveDaysExcludingSundays(startDate, endDate) {
+  if (!startDate || !endDate) return 0;
+
+  const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
+  const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
+  const start = Date.UTC(startYear, startMonth - 1, startDay);
+  const end = Date.UTC(endYear, endMonth - 1, endDay);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return 0;
+
+  const millisecondsPerDay = 24 * 60 * 60 * 1000;
+  const calendarDays = Math.floor((end - start) / millisecondsPerDay) + 1;
+  const firstSundayOffset = (7 - new Date(start).getUTCDay()) % 7;
+  const sundayCount = firstSundayOffset < calendarDays
+    ? 1 + Math.floor((calendarDays - firstSundayOffset - 1) / 7)
+    : 0;
+
+  return calendarDays - sundayCount;
 }
 
 function DatePicker({ date, onChange, label, disabled = false }) {
@@ -137,10 +159,10 @@ function formatApprovalFlowEntry(approverId, fallbackName = '') {
   };
 
   if (aliasMap[trimmedId]) {
-    return `${trimmedId}(${aliasMap[trimmedId]})`;
+    return `${aliasMap[trimmedId]}(${trimmedId})`;
   }
 
-  return fallbackName ? `${fallbackName} (${trimmedId})` : trimmedId;
+  return fallbackName ? `${fallbackName}(${trimmedId})` : trimmedId;
 }
 
 export default function ApplyLeaveForm({ employee, currentUserUsername, approvalFlow }) {
@@ -163,8 +185,9 @@ export default function ApplyLeaveForm({ employee, currentUserUsername, approval
   const [contactNumber, setContactNumber] = useState('');
   const [attachment, setAttachment] = useState(null);
   const [relieverLookupStatus, setRelieverLookupStatus] = useState('');
-  const [submitMessage, setSubmitMessage] = useState('');
   const [submitError, setSubmitError] = useState('');
+  const [validationPopup, setValidationPopup] = useState('');
+  const [redirectAfterPopup, setRedirectAfterPopup] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [approvalFlowDisplay, setApprovalFlowDisplay] = useState([]);
   const [alreadyApplied, setAlreadyApplied] = useState(false);
@@ -215,33 +238,41 @@ export default function ApplyLeaveForm({ employee, currentUserUsername, approval
 
   useEffect(() => {
     const timer = setTimeout(() => {
+      if (startDate && endDate) {
+        const leaveDays = countLeaveDaysExcludingSundays(startDate, endDate);
+        if (leaveDays === 0) {
+          setTotalDays('0');
+          return;
+        }
+
+        if (leaveType === '1Hour') {
+          setTotalDays('0.13');
+          return;
+        }
+
+        const halfDayLeaveType = getHalfDayLeaveType(
+          leaveType,
+          `${startHour}:${startMin} ${startPeriod}`,
+          `${endHour}:${endMin} ${endPeriod}`,
+          startDate,
+          endDate
+        );
+
+        if (halfDayLeaveType) {
+          setTotalDays('0.5');
+          return;
+        }
+
+        setTotalDays(String(leaveDays));
+        return;
+      }
+
       if (leaveType === '1Hour') {
         setTotalDays('0.13');
         return;
       }
 
-      if (startDate && endDate) {
-      const halfDayLeaveType = getHalfDayLeaveType(
-        leaveType,
-        `${startHour}:${startMin} ${startPeriod}`,
-        `${endHour}:${endMin} ${endPeriod}`,
-        startDate,
-        endDate
-      );
-
-      if (halfDayLeaveType) {
-        setTotalDays('0.5');
-        return;
-      }
-
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      const diffTime = end.getTime() - start.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
-      setTotalDays(diffDays > 0 ? String(diffDays) : '0');
-      } else {
-        setTotalDays('');
-      }
+      setTotalDays('');
     }, 0);
 
     return () => clearTimeout(timer);
@@ -281,6 +312,7 @@ export default function ApplyLeaveForm({ employee, currentUserUsername, approval
       const applicantId = employee?.EmpCode || empcode;
       if (!applicantId || !startDate) {
         setAlreadyApplied(false);
+        setValidationPopup((previous) => previous === ALREADY_APPLIED_ERROR ? '' : previous);
         return;
       }
       try {
@@ -288,10 +320,12 @@ export default function ApplyLeaveForm({ employee, currentUserUsername, approval
         const data = await res.json();
         if (data.exists) {
           setAlreadyApplied(true);
-          setSubmitError('Already applied for the day');
+          setSubmitError((previous) => previous === ALREADY_APPLIED_ERROR ? '' : previous);
+          setValidationPopup(ALREADY_APPLIED_ERROR);
         } else {
           setAlreadyApplied(false);
-          setSubmitError(prev => prev === 'Already applied for the day' ? '' : prev);
+          setValidationPopup((previous) => previous === ALREADY_APPLIED_ERROR ? '' : previous);
+          setSubmitError((previous) => previous === ALREADY_APPLIED_ERROR ? '' : previous);
         }
       } catch (err) {
         console.error('Error checking duplicate leave:', err);
@@ -329,7 +363,6 @@ export default function ApplyLeaveForm({ employee, currentUserUsername, approval
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setSubmitMessage('');
     setSubmitError('');
 
     const applicantId = employee?.EmpCode || empcode;
@@ -341,6 +374,11 @@ export default function ApplyLeaveForm({ employee, currentUserUsername, approval
 
     if (!applicantId || !startDate || !endDate || !reason.trim()) {
       setSubmitError('Please complete the required leave fields before submitting.');
+      return;
+    }
+
+    if (totalDaysNum <= 0) {
+      setValidationPopup(NO_LEAVE_DAYS_ERROR);
       return;
     }
 
@@ -370,7 +408,7 @@ export default function ApplyLeaveForm({ employee, currentUserUsername, approval
     }
 
     if (alreadyApplied) {
-      setSubmitError('Already applied for the day');
+      setValidationPopup(ALREADY_APPLIED_ERROR);
       return;
     }
 
@@ -407,8 +445,8 @@ export default function ApplyLeaveForm({ employee, currentUserUsername, approval
         throw new Error(data.error || 'Unable to submit leave application.');
       }
 
-      setSubmitMessage(`Leave application submitted successfully. First approval is pending with ${data.currentApproverName || data.currentApprover || 'the configured approver'}.`);
-      setTimeout(() => window.location.assign('/dashboard/my-leaves'), 1200);
+      setRedirectAfterPopup(true);
+      setValidationPopup(`Leave application submitted successfully. First approval is pending with ${data.currentApproverName || data.currentApprover || 'the configured approver'}.`);
     } catch (err) {
       console.error('Leave submission failed:', err);
       setSubmitError(err.message || 'Leave submission failed.');
@@ -434,11 +472,6 @@ export default function ApplyLeaveForm({ employee, currentUserUsername, approval
           </div>
         </div>
 
-        {submitMessage && (
-          <div className="loginAlert loginAlertSuccess">
-            <span>{submitMessage}</span>
-          </div>
-        )}
         {submitError && (
           <div className="loginAlert loginAlertError">
             <span>{submitError}</span>
@@ -707,6 +740,30 @@ export default function ApplyLeaveForm({ employee, currentUserUsername, approval
           </div>
         </form>
       </div>
+      {validationPopup && (
+        <div className="leavePopupBackdrop">
+          <div
+            className="leaveValidationPopup"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="leaveValidationPopupMessage"
+          >
+            <p id="leaveValidationPopupMessage">{validationPopup}</p>
+            <button
+              type="button"
+              onClick={() => {
+                if (redirectAfterPopup) {
+                  window.location.assign('/dashboard/my-leaves');
+                  return;
+                }
+                setValidationPopup('');
+              }}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

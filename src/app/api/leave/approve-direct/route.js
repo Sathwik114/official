@@ -8,6 +8,7 @@ import {
   updateLeaveRequestRejection,
   updateLeaveRequestStatus,
 } from '@/lib/leaveDb';
+import { getEmployeeDetails } from '@/lib/payrollDb';
 import {
   buildLeaveApprovalNotificationEmailContent,
   buildLeaveRequestEmailContent,
@@ -165,6 +166,8 @@ export async function POST(request) {
             department: leaveRequest.Department,
             startDate: leaveRequest.StartDate,
             endDate: leaveRequest.EndDate,
+            fromTime: leaveRequest.FromTime,
+            toTime: leaveRequest.ToTime,
             leaveType: leaveRequest.LeaveType,
             totalDays: leaveRequest.TotalDays,
             reason: leaveRequest.Reason,
@@ -181,6 +184,10 @@ export async function POST(request) {
         }
       } else if (decisionValue === 'REJECTED') {
         try {
+          const approverEmployee = await getEmployeeDetails(approverId).catch((error) => {
+            console.error('Failed to look up rejecting approver:', error);
+            return null;
+          });
           const emailRequest = {
             applicantId: leaveRequest.ApplicantId,
             applicantName: leaveRequest.ApplicantName || '',
@@ -199,6 +206,8 @@ export async function POST(request) {
           };
           const content = buildLeaveRequestEmailContent(emailRequest, {
             action: 'Rejected',
+            rejectedById: approverId,
+            rejectedByName: approverEmployee?.EmpName || approverId,
             status: 'REJECTED',
             remarks: rejectionReason,
             senderName: approverId,

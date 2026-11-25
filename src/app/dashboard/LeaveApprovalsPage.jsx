@@ -11,6 +11,15 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
+const LEAVE_TYPE_FILTER_OPTIONS = [
+  { value: 'SL', label: 'SL' },
+  { value: 'EL', label: 'EL (EL/P, P/EL)' },
+  { value: 'LWP', label: 'LWP (LWP/P, P/LWP)' },
+  { value: 'OD', label: 'OD' },
+  { value: 'COFF', label: 'COFF (COFF/P, P/COFF)' },
+  { value: 'P/7H', label: 'P/7H' },
+];
+
 function formatApprovalStatus(status, approverId) {
   const normalizedStatus = String(status || '').trim().toUpperCase();
   if (!normalizedStatus || normalizedStatus === 'PENDING') return 'Pending';
@@ -38,6 +47,23 @@ function getApprovalStatusClass(status) {
   return '';
 }
 
+function formatApprovalFlowEntry(approverId, fallbackName = '') {
+  const id = String(approverId || '').trim();
+  if (!id) return '';
+
+  const aliasMap = {
+    '100002': 'CCC',
+    '100209': 'Linus',
+  };
+  const name = aliasMap[id] || fallbackName;
+  return name || id;
+}
+
+function isApprovalPending(status) {
+  const normalizedStatus = String(status || '').trim().toUpperCase();
+  return !['ACCEPT', 'ACCEPTED', 'APPROVED'].includes(normalizedStatus);
+}
+
 export default function LeaveApprovalsPage({ directMode = false, directToken = '' }) {
   const [pendingApprovals, setPendingApprovals] = useState([]);
   const [approvedRequests, setApprovedRequests] = useState([]);
@@ -48,11 +74,30 @@ export default function LeaveApprovalsPage({ directMode = false, directToken = '
   const [expandedId, setExpandedId] = useState(null);
   const [selectedRowId, setSelectedRowId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const [selectedApprovedIds, setSelectedApprovedIds] = useState(new Set());
+  const [selectedFlowApprovers, setSelectedFlowApprovers] = useState({
+    requestId: null,
+    flow: '',
+    names: [],
+  });
   const [activeTab, setActiveTab] = useState('pending');
   const currentDate = new Date();
-  const [monthFilter, setMonthFilter] = useState(String(currentDate.getMonth()));
-  const [yearFilter, setYearFilter] = useState(String(currentDate.getFullYear()));
-  const [approvedSearch, setApprovedSearch] = useState('');
+  const [pendingFilters, setPendingFilters] = useState({
+    search: '',
+    date: '',
+    month: '',
+    leaveType: '',
+    mode: '',
+    year: String(currentDate.getFullYear()),
+  });
+  const [approvedFilters, setApprovedFilters] = useState({
+    search: '',
+    date: '',
+    month: '',
+    leaveType: '',
+    mode: '',
+    year: String(currentDate.getFullYear()),
+  });
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -164,14 +209,6 @@ export default function LeaveApprovalsPage({ directMode = false, directToken = '
     });
   }
 
-  function selectAllToggle() {
-    if (selectedIds.size === pendingApprovals.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(pendingApprovals.map((p) => p.Id)));
-    }
-  }
-
   useEffect(() => {
     const timer = setTimeout(() => {
       loadData();
@@ -189,16 +226,162 @@ export default function LeaveApprovalsPage({ directMode = false, directToken = '
     return formatCalendarDate(value);
   }
 
-  function filterByMonthYear(list) {
-    if (monthFilter === 'all' && (yearFilter === 'all' || yearFilter === '')) return list;
-    return list.filter((r) => {
-      const val = getDateValue(r);
-      const date = getCalendarDateParts(val);
-      if (!date) return false;
-      const monthOk = monthFilter === 'all' || date.month - 1 === Number(monthFilter);
-      const yearOk = yearFilter === 'all' || yearFilter === '' || date.year === Number(yearFilter);
-      return monthOk && yearOk;
+  function filterRequests(requests, filters) {
+    const query = filters.search.trim().toLowerCase();
+
+    return requests.filter((request) => {
+      const applicationDate = getCalendarDateParts(getDateValue(request));
+      if (filters.mode === 'date' && filters.date) {
+        const requestDate = applicationDate
+          ? `${applicationDate.year}-${String(applicationDate.month).padStart(2, '0')}-${String(applicationDate.day).padStart(2, '0')}`
+          : '';
+        if (requestDate !== filters.date) return false;
+      }
+
+      if (filters.mode === 'month' && filters.month
+        && (!applicationDate || applicationDate.month - 1 !== Number(filters.month))) return false;
+      if (filters.year
+        && (!applicationDate || applicationDate.year !== Number(filters.year))) return false;
+      if (filters.mode === 'leave' && filters.leaveType) {
+        const requestLeaveType = String(request.LeaveType || '').trim().toUpperCase();
+        const selectedLeaveType = filters.leaveType.toUpperCase();
+        const matchesLeaveType = ['EL', 'LWP', 'COFF'].includes(selectedLeaveType)
+          ? requestLeaveType === selectedLeaveType
+            || requestLeaveType.startsWith(`${selectedLeaveType}/`)
+            || requestLeaveType.endsWith(`/${selectedLeaveType}`)
+          : requestLeaveType === selectedLeaveType
+            || (selectedLeaveType === 'P/7H' && requestLeaveType === '1HOUR');
+        if (!matchesLeaveType) return false;
+      }
+      if (!query) return true;
+
+      return [
+        'View Form',
+        request.ApplicantId,
+        request.ApplicantName,
+        request.Department,
+        request.Section,
+        formatApplicationDate(request),
+        formatCalendarDate(request.StartDate || request.FromDate),
+        formatCalendarDate(request.EndDate || request.ToDate),
+        request.FromTime,
+        request.ToTime,
+        request.TotalDays,
+        request.LeaveType,
+        formatRequestStatus(request.Status),
+        formatApprovalStatus(request.HodStatus, request.HodApproval),
+        formatApprovalStatus(request.CccStatus, request.CccApproval),
+        request.Reason,
+        request.CurrentApprover,
+      ].some((value) => String(value ?? '').toLowerCase().includes(query));
     });
+  }
+
+  function updateFilters(setFilters, field, value) {
+    setFilters((filters) => ({ ...filters, [field]: value }));
+  }
+
+  function updateFilterMode(setFilters, mode) {
+    setFilters((filters) => ({
+      ...filters,
+      mode,
+      date: '',
+      month: '',
+      leaveType: '',
+    }));
+  }
+
+  function clearFilters(setFilters) {
+    setFilters((filters) => ({
+      ...filters,
+      date: '',
+      month: '',
+      leaveType: '',
+      mode: '',
+      year: String(currentDate.getFullYear()),
+    }));
+  }
+
+  function renderFilterBar(filters, setFilters, label, searchPlaceholder) {
+    return (
+      <div className="leaveFilterBar">
+        <input
+          className="leaveFilterSelect leaveRequestSearch"
+          type="search"
+          value={filters.search}
+          onChange={(event) => updateFilters(setFilters, 'search', event.target.value)}
+          placeholder={searchPlaceholder}
+          aria-label={searchPlaceholder}
+        />
+        <select
+          className="leaveFilterSelect"
+          value={filters.mode}
+          onChange={(event) => updateFilterMode(setFilters, event.target.value)}
+          aria-label={`Choose a filter for ${label}`}
+        >
+          <option value="">Select filter</option>
+          <option value="date">Date</option>
+          <option value="month">Month</option>
+          <option value="leave">Leave type</option>
+        </select>
+        {filters.mode === 'date' && (
+          <input
+            className="leaveFilterSelect"
+            type="date"
+            value={filters.date}
+            onChange={(event) => updateFilters(setFilters, 'date', event.target.value)}
+            aria-label={`Filter ${label} by application date`}
+          />
+        )}
+        {filters.mode === 'month' && (
+          <select
+            className="leaveFilterSelect"
+            value={filters.month}
+            onChange={(event) => updateFilters(setFilters, 'month', event.target.value)}
+            aria-label={`Filter ${label} by month`}
+          >
+            <option value="">All</option>
+            {MONTH_NAMES.map((month, index) => (
+              <option key={month} value={index}>{month}</option>
+            ))}
+          </select>
+        )}
+        {filters.mode === 'leave' && (
+          <select
+            className="leaveFilterSelect"
+            value={filters.leaveType}
+            onChange={(event) => updateFilters(setFilters, 'leaveType', event.target.value)}
+            aria-label={`Filter ${label} by leave type`}
+          >
+            <option value="">All</option>
+            {LEAVE_TYPE_FILTER_OPTIONS.map((leaveType) => (
+              <option key={leaveType.value} value={leaveType.value}>{leaveType.label}</option>
+            ))}
+          </select>
+        )}
+        <label className="leaveYearFilter">
+          <span>Year</span>
+          <input
+            className="leaveFilterSelect"
+            type="text"
+            inputMode="numeric"
+            maxLength={4}
+            value={filters.year}
+            onChange={(event) => updateFilters(setFilters, 'year', event.target.value.replace(/\D/g, ''))}
+            aria-label={`Filter ${label} by year`}
+          />
+        </label>
+        {(filters.mode || filters.year) && (
+          <button
+            type="button"
+            className="leaveClearFiltersButton"
+            onClick={() => clearFilters(setFilters)}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+    );
   }
 
   const renderRequestRow = (request, isPending = true, index = 0) => {
@@ -211,9 +394,18 @@ export default function LeaveApprovalsPage({ directMode = false, directToken = '
         aria-selected={selectedRowId === request.Id}
         onClick={() => setSelectedRowId(request.Id)}
       >
-        {isPending && (
+        {isPending ? (
           <td style={{ textAlign: 'center' }}>
             <input type="checkbox" checked={selectedIds.has(request.Id)} onChange={() => toggleSelect(request.Id)} />
+          </td>
+        ) : (
+          <td style={{ textAlign: 'center' }}>
+            <input
+              type="checkbox"
+              checked={selectedApprovedIds.has(request.Id)}
+              onChange={() => toggleApprovedSelect(request.Id)}
+              aria-label={`Select approved leave for ${request.ApplicantName || request.ApplicantId || 'employee'}`}
+            />
           </td>
         )}
         {!isPending && <td>{request.ApplicantId || '-'}</td>}
@@ -251,29 +443,165 @@ export default function LeaveApprovalsPage({ directMode = false, directToken = '
   const combined = pendingApprovals.concat(approvedRequests || []);
   const uniqueById = Array.from(new Map(combined.map((r) => [r.Id, r])).values());
   const activeRequest = expandedId ? uniqueById.find((r) => r.Id === expandedId) : null;
+  const filteredPending = filterRequests(pendingApprovals, pendingFilters);
+  const filteredApproved = filterRequests(approvedRequests, approvedFilters);
+  const selectedPendingRequests = pendingApprovals.filter((request) => selectedIds.has(request.Id));
+  const selectedApprovedRequests = approvedRequests.filter((request) => selectedApprovedIds.has(request.Id));
+  const isMultiFlowSelection = activeTab === 'pending' && selectedPendingRequests.length > 1;
+  const isMultiApprovedFlowSelection = activeTab === 'approved' && selectedApprovedRequests.length > 1;
+  const allVisiblePendingSelected = filteredPending.length > 1
+    && filteredPending.every((request) => selectedIds.has(request.Id));
+  const allVisibleApprovedSelected = filteredApproved.length > 1
+    && filteredApproved.every((request) => selectedApprovedIds.has(request.Id));
+  const hasSinglePendingSelection = selectedPendingRequests.length === 1;
+  const hasSingleApprovedSelection = selectedApprovedRequests.length === 1;
+  const isPendingFlowOverview = activeTab === 'pending'
+    && (!hasSinglePendingSelection || allVisiblePendingSelected);
+  const isApprovedFlowOverview = activeTab === 'approved'
+    && (!hasSingleApprovedSelection || allVisibleApprovedSelected);
+  const flowRequest = activeTab === 'pending'
+    ? selectedPendingRequests[0]
+    : selectedApprovedRequests[0];
+  const flowRequestId = flowRequest?.Id;
+  const flowDefinition = flowRequest?.ApprovalFlow || '';
 
-  const filteredApproved = filterByMonthYear(approvedRequests).filter((request) => {
-    const query = approvedSearch.trim().toLowerCase();
-    if (!query) return true;
+  useEffect(() => {
+    let cancelled = false;
+    const approverIds = normalizeApproverList(flowDefinition);
 
-    return [
-      request.ApplicantId,
-      request.ApplicantName,
-      request.Department,
-      request.Section,
-      formatApplicationDate(request),
-      formatCalendarDate(request.StartDate || request.FromDate),
-      formatCalendarDate(request.EndDate || request.ToDate),
-      request.FromTime,
-      request.ToTime,
-      request.TotalDays,
-      request.LeaveType,
-      request.Reason,
-      request.AttachmentName,
-      request.CurrentApprover,
-      request.Status,
-    ].some((value) => String(value ?? '').toLowerCase().includes(query));
-  });
+    async function resolveApprovers() {
+      const resolved = await Promise.all(approverIds.map(async (approverId) => {
+        const id = String(approverId || '').trim();
+        if (!id) return '';
+        if (id === '100002' || id === '100209') return formatApprovalFlowEntry(id);
+
+        try {
+          const response = await fetch(`/api/employee?empcode=${encodeURIComponent(id)}`);
+          if (!response.ok) throw new Error(`Employee lookup failed with status ${response.status}`);
+          const data = await response.json();
+          return formatApprovalFlowEntry(id, data.employee?.EmpName || '');
+        } catch (error) {
+          console.error('Approval flow lookup failed:', error);
+          return formatApprovalFlowEntry(id);
+        }
+      }));
+
+      if (!cancelled) {
+        setSelectedFlowApprovers({
+          requestId: flowRequestId,
+          flow: flowDefinition,
+          names: resolved.filter(Boolean),
+        });
+      }
+    }
+
+    if (flowRequestId && flowDefinition) resolveApprovers();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [flowRequestId, flowDefinition]);
+
+  function renderApprovalFlow() {
+    if (!flowRequest && !isMultiFlowSelection && !isMultiApprovedFlowSelection
+      && !isPendingFlowOverview && !isApprovedFlowOverview) {
+      return (
+        <div className="leaveApprovalFlowBanner" aria-label="Leave approval flow">
+          <span className="leaveApprovalFlowLabel">FLOW:</span>
+          <span className="leaveApprovalFlowPrompt">Please select a leave request to see the flow</span>
+        </div>
+      );
+    }
+
+    const showGenericFlow = isPendingFlowOverview || isApprovedFlowOverview;
+    const multiSelectedRequests = isMultiFlowSelection
+      ? selectedPendingRequests
+      : isMultiApprovedFlowSelection ? selectedApprovedRequests : [];
+    const vicePresidentPending = isMultiFlowSelection
+      ? multiSelectedRequests.some((request) => isApprovalPending(request.HodStatus))
+      : isApprovalPending(flowRequest?.HodStatus);
+    const presidentPending = isMultiFlowSelection
+      ? multiSelectedRequests.some((request) => isApprovalPending(request.CccStatus))
+      : isApprovalPending(flowRequest?.CccStatus);
+    const applicantName = String(flowRequest?.ApplicantName || '').trim();
+    const applicant = !showGenericFlow && applicantName
+      ? `Applicant (${applicantName})`
+      : 'Applicant';
+    const resolvedApprovers = selectedFlowApprovers.requestId === flowRequest?.Id
+      && selectedFlowApprovers.flow === flowDefinition
+      ? selectedFlowApprovers.names
+      : [];
+    const hasApprovers = normalizeApproverList(flowDefinition).length > 0;
+    const vicePresident = showGenericFlow
+      ? 'V/Pre (Jeyaram / Linus)'
+      : `V/Pre (${resolvedApprovers[0] || (hasApprovers ? 'Loading...' : 'Not configured')})`;
+    const president = showGenericFlow
+      ? 'Pre (CCC)'
+      : `Pre (${resolvedApprovers[1] || (hasApprovers ? 'Loading...' : 'Not configured')})`;
+    const applicantClass = showGenericFlow
+      ? 'leaveApprovalFlowOverviewStep'
+      : 'leaveApprovalFlowComplete';
+    const vicePresidentClass = showGenericFlow
+      ? 'leaveApprovalFlowOverviewStep'
+      : vicePresidentPending ? 'leaveApprovalFlowPending' : 'leaveApprovalFlowComplete';
+    const presidentClass = showGenericFlow
+      ? 'leaveApprovalFlowOverviewStep'
+      : presidentPending ? 'leaveApprovalFlowPending' : 'leaveApprovalFlowComplete';
+
+    return (
+      <div className="leaveApprovalFlowBanner" aria-label="Leave approval flow">
+        <span className="leaveApprovalFlowLabel">FLOW: </span>
+        <span className={`leaveApprovalFlowStep ${applicantClass}`}>{applicant}</span>
+        <span className="leaveApprovalFlowArrow" aria-hidden="true">→</span>
+        <span className={`leaveApprovalFlowStep ${vicePresidentClass}`}>
+          {vicePresident}
+        </span>
+        <span className="leaveApprovalFlowArrow" aria-hidden="true">→</span>
+        <span className={`leaveApprovalFlowStep ${presidentClass}`}>
+          {president}
+        </span>
+      </div>
+    );
+  }
+
+  function selectAllToggle() {
+    const visibleIds = filteredPending.map((request) => request.Id);
+    const allVisibleSelected = visibleIds.length > 0
+      && visibleIds.every((id) => selectedIds.has(id));
+
+    setSelectedIds((previous) => {
+      const next = new Set(previous);
+      visibleIds.forEach((id) => {
+        if (allVisibleSelected) next.delete(id);
+        else next.add(id);
+      });
+      return next;
+    });
+  }
+
+  function toggleApprovedSelect(id) {
+    setSelectedApprovedIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAllApprovedToggle() {
+    const visibleIds = filteredApproved.map((request) => request.Id);
+    const allVisibleSelected = visibleIds.length > 0
+      && visibleIds.every((id) => selectedApprovedIds.has(id));
+
+    setSelectedApprovedIds((previous) => {
+      const next = new Set(previous);
+      visibleIds.forEach((id) => {
+        if (allVisibleSelected) next.delete(id);
+        else next.add(id);
+      });
+      return next;
+    });
+  }
 
   async function handleApproveDetail() {
     if (!activeRequest) return;
@@ -354,17 +682,24 @@ export default function LeaveApprovalsPage({ directMode = false, directToken = '
         <button
           type="button"
           className={`leaveTabButton ${activeTab === 'pending' ? 'leaveTabButtonActive' : ''}`}
-          onClick={() => setActiveTab('pending')}
+          onClick={() => {
+            setActiveTab('pending');
+            setSelectedRowId(null);
+          }}
         >
           New leave requests
         </button>
         <button
           type="button"
           className={`leaveTabButton ${activeTab === 'approved' ? 'leaveTabButtonActive' : ''}`}
-          onClick={() => setActiveTab('approved')}
+          onClick={() => {
+            setActiveTab('approved');
+            setSelectedRowId(null);
+          }}
         >
           Approved leaves
         </button>
+        {renderApprovalFlow()}
       </div>
 
       <div className="leaveApprovalMessageWrap">
@@ -390,9 +725,16 @@ export default function LeaveApprovalsPage({ directMode = false, directToken = '
         <>
           {activeTab === 'pending' && (
             <div className="leaveTableCard leavePendingCard">
-              <h2>New leave requests</h2>
-              {pendingApprovals.length === 0 ? (
-                <p>No pending approvals.</p>
+              <div className="leaveApprovedCardHeader leaveRequestCardHeader">
+                <h2>New leave requests</h2>
+                {renderFilterBar(pendingFilters, setPendingFilters, 'new leave requests', 'Search new leave requests')}
+              </div>
+              {filteredPending.length === 0 ? (
+                <p>
+                  {pendingApprovals.length === 0
+                    ? 'No pending approvals.'
+                    : 'No pending requests match these filters.'}
+                </p>
               ) : (
                 <>
                   <div className="leaveTableScrollWrapper leavePendingTableScrollWrapper">
@@ -402,7 +744,8 @@ export default function LeaveApprovalsPage({ directMode = false, directToken = '
                           <th style={{ width: '40px', textAlign: 'center' }}>
                             <input
                               type="checkbox"
-                              checked={selectedIds.size === pendingApprovals.length && pendingApprovals.length > 0}
+                              checked={filteredPending.length > 0
+                                && filteredPending.every((request) => selectedIds.has(request.Id))}
                               onChange={selectAllToggle}
                             />
                           </th>
@@ -426,7 +769,7 @@ export default function LeaveApprovalsPage({ directMode = false, directToken = '
                         </tr>
                       </thead>
                       <tbody>
-                        {pendingApprovals.map((request, index) => renderRequestRow(request, true, index))}
+                        {filteredPending.map((request, index) => renderRequestRow(request, true, index))}
                       </tbody>
                     </table>
                   </div>
@@ -449,37 +792,9 @@ export default function LeaveApprovalsPage({ directMode = false, directToken = '
 
           {activeTab === 'approved' && (
             <div className="leaveTableCard leaveApprovedCard">
-              <div className="leaveApprovedCardHeader">
+              <div className="leaveApprovedCardHeader leaveRequestCardHeader">
                 <h2>Approved leaves</h2>
-                <div className="leaveFilterBar">
-                  <input
-                    className="leaveFilterSelect leaveApprovedSearch"
-                    type="search"
-                    value={approvedSearch}
-                    onChange={(e) => setApprovedSearch(e.target.value)}
-                    placeholder="Search approved leaves"
-                    aria-label="Search approved leaves"
-                  />
-                  <select
-                    className="leaveFilterSelect"
-                    value={monthFilter}
-                    onChange={(e) => setMonthFilter(e.target.value)}
-                  >
-                    <option value="all">All Months</option>
-                    {MONTH_NAMES.map((m, i) => (
-                      <option key={m} value={i}>{m}</option>
-                    ))}
-                  </select>
-                  <input
-                    className="leaveFilterSelect"
-                    type="number"
-                    min="1900"
-                    step="1"
-                    value={yearFilter}
-                    onChange={(e) => setYearFilter(e.target.value)}
-                    placeholder="Year"
-                  />
-                </div>
+                {renderFilterBar(approvedFilters, setApprovedFilters, 'approved leaves', 'Search leaves')}
               </div>
               {filteredApproved.length === 0 ? (
                 <p>
@@ -492,6 +807,15 @@ export default function LeaveApprovalsPage({ directMode = false, directToken = '
                   <table className="leaveNoScrollTable">
                     <thead>
                       <tr>
+                        <th style={{ width: '40px', textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={filteredApproved.length > 0
+                              && filteredApproved.every((request) => selectedApprovedIds.has(request.Id))}
+                            onChange={selectAllApprovedToggle}
+                            aria-label="Select all visible approved leaves"
+                          />
+                        </th>
                         <th>Emp ID</th>
                         <th>Action</th>
                         <th>Emp Name</th>

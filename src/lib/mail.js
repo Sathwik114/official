@@ -54,6 +54,8 @@ export function buildLeaveApprovalNotificationEmailContent({
   department,
   startDate,
   endDate,
+  fromTime,
+  toTime,
   leaveType,
   totalDays,
   reason,
@@ -64,6 +66,8 @@ export function buildLeaveApprovalNotificationEmailContent({
   const safeDepartment = escapeHtml(department || '-');
   const safeStartDate = escapeHtml(formatEmailCalendarDate(startDate));
   const safeEndDate = escapeHtml(formatEmailCalendarDate(endDate));
+  const safeFromTime = escapeHtml(fromTime || '-');
+  const safeToTime = escapeHtml(toTime || '-');
   const safeLeaveType = escapeHtml(leaveType || '-');
   const safeTotalDays = escapeHtml(totalDays ?? '-');
   const safeReason = escapeHtml(reason || '-');
@@ -75,7 +79,7 @@ export function buildLeaveApprovalNotificationEmailContent({
     html: `
       <div style="font-family:Arial,sans-serif;color:#1e293b;max-width:600px;margin:0 auto;padding:24px;">
         <h2 style="margin-top:0;">Leave approval required</h2>
-        <p>The following Employee was Applied for a Leave, waiting for your approval.</p>
+        <p>The following Employee was Applied for Leave, waiting for your approval.</p>
         <table style="border-collapse:collapse;width:100%;margin:16px 0;table-layout:fixed;">
           <colgroup>
             <col style="width:16%;">
@@ -101,6 +105,12 @@ export function buildLeaveApprovalNotificationEmailContent({
               <td style="${valueStyle}">${safeEndDate}</td>
             </tr>
             <tr>
+              <td style="${labelStyle}"><strong>From time</strong></td>
+              <td style="${valueStyle}">${safeFromTime}</td>
+              <td style="${labelStyle}"><strong>To time</strong></td>
+              <td style="${valueStyle}">${safeToTime}</td>
+            </tr>
+            <tr>
               <td style="${labelStyle}"><strong>Leave type</strong></td>
               <td style="${valueStyle}">${safeLeaveType}</td>
               <td style="${labelStyle}"><strong>Total days</strong></td>
@@ -124,6 +134,8 @@ export function buildLeaveApprovalNotificationEmailContent({
       `Department: ${department || '-'}`,
       `Start date: ${formatEmailCalendarDate(startDate)}`,
       `End date: ${formatEmailCalendarDate(endDate)}`,
+      `From time: ${fromTime || '-'}`,
+      `To time: ${toTime || '-'}`,
       `Leave type: ${leaveType || '-'}`,
       `Total days: ${totalDays ?? '-'}`,
       `Reason: ${reason || '-'}`,
@@ -209,7 +221,93 @@ export function buildLeaveRequestEmailContent(request, options = {}) {
     status = 'PENDING',
     remarks = '',
     senderName = 'HR Department',
+    rejectedById = '',
+    rejectedByName = '',
   } = options;
+
+  if (String(action).toUpperCase() === 'REJECTED') {
+    const normalizedRejectedById = String(rejectedById || '').trim();
+    const aliasMap = {
+      '100002': 'CCC',
+      '100209': 'Linus',
+    };
+    const resolvedRejectedByName = aliasMap[normalizedRejectedById]
+      || rejectedByName
+      || normalizedRejectedById
+      || '-';
+    const rejectedBy = normalizedRejectedById
+      ? `${resolvedRejectedByName}(${normalizedRejectedById})`
+      : resolvedRejectedByName;
+    const labelStyle = 'padding:10px 12px;font-weight:600;color:#475569;background-color:#fafbfc;border:1px solid #cbd5e1;text-align:left;width:25%;';
+    const valueStyle = 'padding:10px 12px;font-weight:700;color:#0f172a;border:1px solid #cbd5e1;text-align:left;overflow-wrap:anywhere;';
+    const safeApplicantName = escapeHtml(request.applicantName || '-');
+    const safeApplicantId = escapeHtml(request.applicantId || '-');
+    const safeDepartment = escapeHtml(request.department || '-');
+    const safeStartDate = escapeHtml(formatEmailCalendarDate(request.startDate));
+    const safeEndDate = escapeHtml(formatEmailCalendarDate(request.endDate));
+    const safeFromTime = escapeHtml(request.fromTime || request.FromTime || '-');
+    const safeToTime = escapeHtml(request.toTime || request.ToTime || '-');
+    const safeLeaveType = escapeHtml(request.leaveType || '-');
+    const safeTotalDays = escapeHtml(request.totalDays ?? '-');
+    const safeReason = escapeHtml(request.reason || '-');
+    const safeRejectedBy = escapeHtml(rejectedBy);
+    const safeRemarks = escapeHtml(remarks || '-');
+    const pairRow = (leftLabel, leftValue, rightLabel, rightValue) => `
+      <tr>
+        <td style="${labelStyle}">${leftLabel}</td>
+        <td style="${valueStyle}">${leftValue}</td>
+        <td style="${labelStyle}">${rightLabel}</td>
+        <td style="${valueStyle}">${rightValue}</td>
+      </tr>`;
+    const fullRow = (label, value) => `
+      <tr>
+        <td style="${labelStyle}">${label}</td>
+        <td colspan="3" style="${valueStyle}white-space:pre-wrap;">${value}</td>
+      </tr>`;
+
+    return {
+      html: `
+        <div style="font-family:Arial,sans-serif;color:#1e293b;background:#f8fafc;padding:24px;">
+          <div style="max-width:700px;margin:0 auto;background:#fff;border:1px solid #cbd5e1;border-radius:12px;overflow:hidden;">
+            <div style="background:linear-gradient(135deg,#0284c7,#0f172a);padding:24px;text-align:center;color:#fff;">
+              <h2 style="margin:0;font-size:20px;">Leave Request Rejected</h2>
+            </div>
+            <p style="margin:20px 24px 0;color:#475569;">Your leave request has been rejected. Details are below.</p>
+            <div style="padding:20px 24px 24px;">
+              <table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;">
+                <tbody>
+                  ${fullRow('Employee Name:', safeApplicantName)}
+                  ${pairRow('Employee ID:', safeApplicantId, 'Department:', safeDepartment)}
+                  ${pairRow('Start Date:', safeStartDate, 'End Date:', safeEndDate)}
+                  ${pairRow('From Time:', safeFromTime, 'To Time:', safeToTime)}
+                  ${pairRow('Leave Type:', safeLeaveType, 'Total Days:', safeTotalDays)}
+                  ${fullRow('Reason:', safeReason)}
+                  ${fullRow('Rejected by:', safeRejectedBy)}
+                  ${fullRow('Rejected Reason:', safeRemarks)}
+                </tbody>
+              </table>
+            </div>
+            <p style="margin:0;padding:16px 24px;border-top:1px solid #e2e8f0;font-size:12px;color:#64748b;text-align:center;">This email was automatically generated by the Leave Management System.</p>
+          </div>
+        </div>
+      `,
+      text: [
+        'Leave Request Rejected',
+        `Employee Name: ${request.applicantName || '-'}`,
+        `Employee ID: ${request.applicantId || '-'}`,
+        `Department: ${request.department || '-'}`,
+        `Start Date: ${formatEmailCalendarDate(request.startDate)}`,
+        `End Date: ${formatEmailCalendarDate(request.endDate)}`,
+        `From Time: ${request.fromTime || request.FromTime || '-'}`,
+        `To Time: ${request.toTime || request.ToTime || '-'}`,
+        `Leave Type: ${request.leaveType || '-'}`,
+        `Total Days: ${request.totalDays ?? '-'}`,
+        `Reason: ${request.reason || '-'}`,
+        `Rejected by: ${rejectedBy}`,
+        `Rejected Reason: ${remarks || '-'}`,
+      ].join('\n'),
+    };
+  }
 
   const approvalFlow = Array.isArray(request.approvalFlow)
     ? request.approvalFlow.join(' → ')
